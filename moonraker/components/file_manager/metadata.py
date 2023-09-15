@@ -378,6 +378,14 @@ class PrusaSlicer(BaseSlicer):
         return _regex_find_first(
             r"total\sfilament\sused\s\[g\]\s=\s(\d+\.\d*)", self.footer_data)
 
+    def parse_initial_tool(self) -> Optional[float]:
+        return _regex_find_string(
+            r"#\s!UBOE:\sspoolman\s:\s=\s*(\d+)", self.footer_data)
+
+    def parse_filament_used(self) -> Optional[float]:
+        return _regex_find_string(
+            r";\sfilament\sused\s\[g\]\s=\s(.*)", self.footer_data)
+
     def parse_filament_type(self) -> Optional[str]:
         return _regex_find_string(
             r";\sfilament_type\s=\s(.*)", self.footer_data)
@@ -965,6 +973,7 @@ SUPPORTED_DATA = [
     'chamber_temp',
     'filament_name',
     'filament_type',
+    'filament_used',
     'filament_total',
     'filament_weight_total',
     'thumbnails']
