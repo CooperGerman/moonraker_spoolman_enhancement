@@ -386,6 +386,10 @@ class PrusaSlicer(BaseSlicer):
         return _regex_find_string(
             r";\sfilament\sused\s\[g\]\s=\s(.*)", self.footer_data)
 
+    def parse_print_compatible_printers(self) -> Optional[str]:
+        return _regex_find_string(
+            r";\s_print_compatible_printers\s=\s(.*)", self.footer_data)
+
     def parse_filament_type(self) -> Optional[str]:
         return _regex_find_string(
             r";\sfilament_type\s=\s(.*)", self.footer_data)
@@ -975,6 +979,7 @@ SUPPORTED_DATA = [
     'filament_type',
     'filament_used',
     'filament_total',
+    'print_compatible_printers',
     'filament_weight_total',
     'thumbnails']
 

@@ -52,6 +52,8 @@ class UboeSpoolManager(SpoolManager):
     '''
     def __init__(self, config: ConfigHelper):
         super().__init__(config)
+        self.is_mmu = config.getboolean("is_mmu", default=False)
+        self.printer_info = self.server.get_host_info()
         self.next_active_spool_update_time = 0.0
         self._register_notifications()
         self.server.register_remote_method(
@@ -61,15 +63,17 @@ class UboeSpoolManager(SpoolManager):
             "spoolman_check_filament", self.check_filament
         )
 
+    async def _log_n_send(self, msg):
+        ''' logs and sends msg to the klipper console'''
+        logging.error(msg)
+        await self.klippy_apis.run_gcode(f"M118 {msg}", None)
+
     def _register_notifications(self):
         super()._register_notifications()
-        self.server.register_notification("spoolman:active_spool_get")
+        self.server.register_notification("spoolman:get_spool_info")
         self.server.register_notification("spoolman:check_filament")
 
     async def get_info_for_spool(self, spool_id):
-        self.server.send_event(
-            "spoolman:active_spool_get", {"spool_id": spool_id}
-        )
         logging.info(f"Active spool received: {spool_id}")
         args ={
             "request_method" : "GET",
@@ -91,9 +95,12 @@ class UboeSpoolManager(SpoolManager):
         '''
         logging.info(f"Fetching active spool")
         spool_id = await self._get_active_spool()
+        self.server.send_event(
+            "spoolman:get_spool_info", {"spool_id": spool_id}
+        )
         spool_info = await self.get_info_for_spool(spool_id)
-        logging.info(f"Spool info: {spool_info}")
-        await self.klippy_apis.run_gcode(f"M118 Active spool is: {spool_info}", None)
+        msg = f"Active spool is: {spool_info}"
+        await self._log_n_send(msg)
 
     async def _get_active_spool(self):
         spool_id = await self.database.get_item(
@@ -101,27 +108,91 @@ class UboeSpoolManager(SpoolManager):
         )
         return spool_id
 
-    async def verify_consistency(self, metadata, active_spool):
+    async def verify_consistency(self, metadata, spools):
         '''
         Verifies that the filament type, name, color and amount are consistent with the spoolman db
+        parameters:
+            @param metadata: metadata extracted from the gcode file
+            @param spools: list of spools assigned to the current machine retrieved from spoolman db
         '''
-        pass
+        # location field in spoolman db is the <hostname of the machine>:<tool_id>
+        # tool_id is 0 for single extruder machines
+        # build a list of all the tools assigned to the current machine
+        sb_tools = {}
+        for spool in spools :
+            tool_id = spool["location"].split(":")[1]
+            sb_tools[int(tool_id)] = spool
 
-    async def get_spools_for_machine(self, printer_info) -> List[Dict[str, Any]]:
+        mdata_filaments = metadata["filament_name"].replace("\"", "").replace("\n", "").split(";")
+        mdata_filament_usage = metadata["filament_used"].replace("\"", "").replace("\n", "").split(",")
+
+        # build the equivalent list for the gcode metadata
+        metadata_tools = {}
+        for id, filament in enumerate(mdata_filaments):
+            if not filament == 'EMPTY' :
+                metadata_tools[id] = {'name' : filament, 'usage' : float(mdata_filament_usage[id])}
+            elif filament == 'EMPTY' and not (float(mdata_filament_usage[id]) == 0) :
+                msg = f"Filament usage for tool {id} is not 0 but filament is EMPTY placeholder. Please check your slicer setup and regenerate the gcode file."
+                await self._log_n_send(msg)
+                return False
+            elif filament == 'EMPTY' and (float(mdata_filament_usage[id]) == 0) :
+                # seems coherent
+                pass
+            else :
+                # everything is fine
+                pass
+
+        # compare the two lists
+        mismatch = False
+        # check list length
+        if len(sb_tools) != len(metadata_tools):
+            msg = f"Number of tools mismatch between spoolman slicer and klipper: {len(sb_tools)} != {len(metadata_tools)}"
+            mismatch = True
+            await self._log_n_send(msg)
+
+        # check filaments names for each tool
+        for tool_id, filament in metadata_tools.items():
+            # if tool_id from slicer is not in spoolman db
+            if tool_id not in sb_tools :
+                msg = f"Tool id {tool_id} of machine {self.printer_info['hostname']} not assigned to a spool in spoolman db"
+                mismatch = True
+                await self._log_n_send(msg)
+            else :
+                # if filament name from slicer is not the same as the one in spoolman db
+                if sb_tools[tool_id]['filament']['name'] != filament['name']:
+                    msg = f"Filament mismatch spoolman vs slicer @id {tool_id}: {sb_tools[tool_id]['filament']['name']} != {filament['name']}"
+                    mismatch = True
+                    await self._log_n_send(msg)
+
+        if mismatch:
+            return False
+
+        # check that the amount of filament left in the spool is sufficient
+        # get the amount of filament needed for each tool
+        for tool_id, filament in metadata_tools.items():
+            if filament['usage'] > sb_tools[tool_id]['remaining_weight']:
+                msg = f"WARNING : Filament amount insufficient for spool {filament['name']}: {sb_tools[tool_id]['remaining_weight']*100/100} < {filament['usage']*100/100}"
+                mismatch = True
+                await self._log_n_send(msg)
+                msg = f"Expect filament runout for machine {self.printer_info['hostname']}, or setup the mmu in order to avoid this."
+                await self._log_n_send(msg)
+        if mismatch:
+            return False
+
+        return True
+
+    async def get_spools_for_machine(self) -> List[Dict[str, Any]]:
         '''
         Gets all spools assigned to the current machine
         '''
         # get current printer hostname
-        # machine_hostname = printer_info["info"]["hostname"]
-        logging.info(f"Getting spools for machine: {printer_info}")
-        return
+        machine_hostname = self.printer_info["hostname"]
+        logging.info(f"Getting spools for machine: {machine_hostname}")
 
-        if machine_hostname is None:
-            machine_hostname = await self.machine.get_machine_hostname()
         args ={
             "request_method" : "GET",
-            "path" : f"/v1/spools",
-            "query" : f"machine_hostname={machine_hostname}",
+            "path" : f"/v1/spool",
+            "query" : f"location={machine_hostname}",
 
         }
         webrequest = WebRequest(
@@ -129,7 +200,15 @@ class UboeSpoolManager(SpoolManager):
             args=args,
             action="GET",
         )
-        spools = await self._proxy_spoolman_request(webrequest)
+        try :
+            spools = await self._proxy_spoolman_request(webrequest)
+        except Exception as e:
+            await self._log_n_send(f"Failed to retrieve spools from spoolman: {e}")
+            return False
+        if not self.is_mmu and len(spools) > 1:
+            await self._log_n_send(f"More than one spool assigned to machine: {machine_hostname} but MMU is not enabled")
+            return False
+        await self._log_n_send(f"Spools for machine: {[spool['filament']['name'] for spool in spools]}")
         return spools
 
     async def check_filament(self):
@@ -138,7 +217,7 @@ class UboeSpoolManager(SpoolManager):
         based on the filament type and the amount of filament left in spoolman db.
         '''
         self.server.send_event(
-            "spoolman:active_spool_get", {}
+            "spoolman:check_filament", {}
         )
         logging.info(f"Checking filament")
         # verify that klipper is ready
@@ -147,21 +226,22 @@ class UboeSpoolManager(SpoolManager):
             return False
         kapi: KlippyAPI = self.server.lookup_component("klippy_apis")
         try:
-            is_active = await kapi.query_objects({"virtual_sdcard": None})
-            filename = await kapi.query_objects({"print_stats": None})
-            printer_info = await kapi.query_objects({"printer.info": None})
+            virtual_sdcard = await kapi.query_objects({"virtual_sdcard": None})
+            print_stats = await kapi.query_objects({"print_stats": None})
         except Exception:
             # Klippy not connected
-            logging.error(f"Klippy not retrieve is_active or filename")
+            logging.error(f"Klippy not retrieve virtual_sdcard or print_stats")
             return False
 
-        is_active = is_active["virtual_sdcard"]['is_active']
-        filename = filename["print_stats"]["filename"]
+        is_active = virtual_sdcard["virtual_sdcard"]['is_active']
+        filename = os.path.join('/home', 'uboe', 'printer_data', 'gcodes', print_stats["print_stats"]["filename"])
+        state = print_stats["print_stats"]["state"]
 
-        # if is_active not in ['printing', 'paused']: # !TODO : Reactiviate this
-        #     # No print active
-        #     logging.error(f"No print active, cannot get gcode from file")
-        #     return False
+        if state not in ['printing', 'paused']:
+            # No print active
+            msg = f"No print active, cannot get gcode from file (state: {state})"
+            await self._log_n_send(msg)
+            return False
 
         # Get gcode from file
         if filename is None:
@@ -169,20 +249,38 @@ class UboeSpoolManager(SpoolManager):
             return False
 
         metadata: Dict[str, Any] = {}
-        # if not filename: # !TODO : Reactiviate this
-        #     logging.info(f"No filemame retrieved: {filename}")
-        #     sys.exit(-1)
-        filename = os.path.join('/', 'home', 'uboe', 'Cone_ASA_9m43s.gcode')
+        if not filename:
+            logging.info(f"No filemame retrieved: {filename}")
+            sys.exit(-1)
         try:
             metadata = extract_metadata(filename, False)
         except Exception:
             raise Exception(f"Failed to extract metadata from {filename}")
 
         # Get spools assigned to current machine
-        spools = await self.get_spools_for_machine(printer_info)
-        # active_spool = await self.get_active_spool()
+        ret = await self.get_spools_for_machine()
+        if ret == False:
+            return False
+        spools = ret
+        if not spools:
+            msg = f"No spools assigned to machine: {self.printer_info['hostname']}"
+            await self._log_n_send(msg)
+            return False
 
-        # await self.verify_consistency(metadata, active_spool)
+        ret = await self.verify_consistency(metadata, spools)
+        if ret :
+            msg = f"Slicer setup and spoolman db are consistent"
+            await self._log_n_send(msg)
+            return True
+        else :
+            msg = f"FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED! PAUSING PRINT."
+            await self._log_n_send(msg)
+            msg = f"Please check the spoolman setup and physical spools to match the slicer setup."
+            await self._log_n_send(msg)
+            #if printer is runnning, pause it
+            if state not in ['paused', 'cancelled', 'complete', 'standby']:
+                await self.klippy_apis.run_gcode(f"PAUSE", None)
+            return False
 
 
 def load_component(config: ConfigHelper) -> UboeSpoolManager:
