@@ -65,6 +65,9 @@ class UboeSpoolManager(SpoolManager):
         self.server.register_remote_method(
             "spoolman_get_spools_for_machine", self.get_spools_for_machine
         )
+        self.server.register_remote_method(
+            "spoolman_set_spool_for_machine", self.set_spool_for_machine
+        )
 
     async def _log_n_send(self, msg):
         ''' logs and sends msg to the klipper console'''
@@ -76,8 +79,8 @@ class UboeSpoolManager(SpoolManager):
         self.server.register_notification("spoolman:get_spool_info")
         self.server.register_notification("spoolman:check_filament")
 
-    async def get_info_for_spool(self, spool_id):
-        logging.info(f"Active spool received: {spool_id}")
+    async def get_info_for_spool(self, spool_id : int):
+        logging.info(f"spool id received: {spool_id}")
         args ={
             "request_method" : "GET",
             "path" : f"/v1/spool/{spool_id}",
@@ -96,10 +99,11 @@ class UboeSpoolManager(SpoolManager):
         '''
         Gets info for active spool id and sends it to the klipper console
         '''
-        logging.info(f"Fetching active spool")
-        if not id:
+        if not id :
+            logging.info(f"Fetching active spool")
             spool_id = await self._get_active_spool()
         else:
+            logging.info(f"Setting spool id: {id}")
             spool_id = id
         self.server.send_event(
             "spoolman:get_spool_info", {"spool_id": spool_id}
@@ -225,6 +229,15 @@ class UboeSpoolManager(SpoolManager):
                 self._log_n_send(f"location field for {spool['filament']['name']} @ {spool['id']} in spoolman db is not formatted correctly. Please check the spoolman setup.")
             await self._log_n_send(f"   {spool['filament']['name']} (index : {spool['id']})")
         return spools
+
+    async def set_spool_for_machine(self, spool_id : int) -> bool:
+        '''
+        Sets the spool with id=id for the current machine into optional slot number if mmu is enabled.
+
+        parameters:
+            @param spool_id: id of the spool to set
+        '''
+        pass
 
     async def check_filament(self):
         '''
