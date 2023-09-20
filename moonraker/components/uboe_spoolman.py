@@ -240,6 +240,7 @@ class UboeSpoolManager(SpoolManager):
             logging.error(f"Klippy not ready")
             return False
         kapi: KlippyAPI = self.server.lookup_component("klippy_apis")
+        kapi.pause_print()
         try:
             virtual_sdcard = await kapi.query_objects({"virtual_sdcard": None})
             print_stats = await kapi.query_objects({"print_stats": None})
@@ -286,6 +287,7 @@ class UboeSpoolManager(SpoolManager):
         if ret :
             msg = f"Slicer setup and spoolman db are consistent"
             await self._log_n_send(msg)
+            kapi.resume_print()
             return True
         else :
             msg = f"FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED! PAUSING PRINT."
@@ -294,7 +296,7 @@ class UboeSpoolManager(SpoolManager):
             await self._log_n_send(msg)
             #if printer is runnning, pause it
             if state not in ['paused', 'cancelled', 'complete', 'standby']:
-                await self.klippy_apis.run_gcode(f"PAUSE", None)
+                await kapi.pause_print()
             return False
 
 
