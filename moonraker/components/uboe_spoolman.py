@@ -92,12 +92,15 @@ class UboeSpoolManager(SpoolManager):
         spool_info = await self._proxy_spoolman_request(webrequest)
         return spool_info
 
-    async def get_spool_info(self):
+    async def get_spool_info(self, id : int=None):
         '''
-        Gets info for active spool
+        Gets info for active spool id and sends it to the klipper console
         '''
         logging.info(f"Fetching active spool")
-        spool_id = await self._get_active_spool()
+        if not id:
+            spool_id = await self._get_active_spool()
+        else:
+            spool_id = id
         self.server.send_event(
             "spoolman:get_spool_info", {"spool_id": spool_id}
         )
