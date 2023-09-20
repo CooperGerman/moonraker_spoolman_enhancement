@@ -4,6 +4,7 @@
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
 from __future__ import annotations
+import json
 from .spoolman import *
 from .file_manager.metadata import extract_metadata
 
@@ -52,7 +53,9 @@ class UboeSpoolManager(SpoolManager):
     '''
     def __init__(self, config: ConfigHelper):
         super().__init__(config)
-        self.is_mmu = config.getboolean("is_mmu", default=False)
+        self.filament_slots = config.getint("spoolman", "filament_slots", fallback=1)
+        if self.filament_slots < 1 :
+            self._log_n_send(f"Number of filament slots is not set or is less than 1. Please check the spoolman or moonraker [spoolman] setup.")
         self.printer_info = self.server.get_host_info()
         self.next_active_spool_update_time = 0.0
         self._register_notifications()
@@ -106,7 +109,7 @@ class UboeSpoolManager(SpoolManager):
             logging.info(f"Setting spool id: {id}")
             spool_id = id
         self.server.send_event(
-            "spoolman:get_spool_info", {"spool_id": spool_id}
+            "spoolman:get_spool_info", {"id": spool_id}
         )
         spool_info = await self.get_info_for_spool(spool_id)
         msg = f"Active spool is: {spool_info['filament']['name']} (id : {spool_info['id']})"
@@ -195,7 +198,7 @@ class UboeSpoolManager(SpoolManager):
 
         return True
 
-    async def get_spools_for_machine(self) -> List[Dict[str, Any]]:
+    async def get_spools_for_machine(self, silent=False) -> List[Dict[str, Any]]:
         '''
         Gets all spools assigned to the current machine
         '''
@@ -217,27 +220,105 @@ class UboeSpoolManager(SpoolManager):
         try :
             spools = await self._proxy_spoolman_request(webrequest)
         except Exception as e:
-            await self._log_n_send(f"Failed to retrieve spools from spoolman: {e}")
+            if not silent : await self._log_n_send(f"Failed to retrieve spools from spoolman: {e}")
             return False
-        if not self.is_mmu and len(spools) > 1:
-            await self._log_n_send(f"More than one spool assigned to machine: {machine_hostname} but MMU is not enabled")
+        if self.filament_slots < len(spools) :
+            if not silent : await self._log_n_send(f"Number of spools assigned to machine {machine_hostname} is greater than the number of slots available on the machine. Please check the spoolman or moonraker [spoolman] setup.")
             return False
-        await self._log_n_send(f"Spools for machine:")
+        if not silent : await self._log_n_send(f"Spools for machine:")
         for spool in spools:
             index = spool['location'].split(machine_hostname+':')[1]
             if not index :
-                self._log_n_send(f"location field for {spool['filament']['name']} @ {spool['id']} in spoolman db is not formatted correctly. Please check the spoolman setup.")
-            await self._log_n_send(f"   {spool['filament']['name']} (index : {spool['id']})")
+                if not silent : self._log_n_send(f"location field for {spool['filament']['name']} @ {spool['id']} in spoolman db is not formatted correctly. Please check the spoolman setup.")
+            if not silent : await self._log_n_send(f"   {spool['filament']['name']} (index : {spool['id']})")
         return spools
 
-    async def set_spool_for_machine(self, spool_id : int) -> bool:
+    async def set_spool_for_machine(self, spool_id : int, slot : int=None) -> bool:
         '''
         Sets the spool with id=id for the current machine into optional slot number if mmu is enabled.
 
         parameters:
             @param spool_id: id of the spool to set
+            @param slot: optional slot number to set the spool into. If not provided (and number of slots = 1), the spool will be set into slot 0.
+        returns:
+            @return: True if successful, False otherwise
         '''
-        pass
+        if spool_id == None :
+            msg = f"Trying to set spool but no spool id provided."
+            await self._log_n_send(msg)
+            return False
+
+        logging.info(f"Setting spool {spool_id} for machine: {self.printer_info['hostname']} @ slot {slot}")
+        self.server.send_event(
+            "spoolman:set_spool_for_machine", {"id": spool_id, "slot": slot}
+        )
+        # check that slot not higher than number of slots available
+        if (slot == None) and (self.filament_slots > 1) :
+            msg = f"Trying to set spool {spool_id} for machine {self.printer_info['hostname']} but no slot number provided."
+            await self._log_n_send(msg)
+            return False
+        elif (slot == None) and (self.filament_slots == 1) :
+            slot = 0
+        elif slot > self.filament_slots-1 :
+            msg = f"Trying to set spool {spool_id} for machine {self.printer_info['hostname']} @ slot {slot} but only {self.filament_slots} slots are available. Please check the spoolman or moonraker [spoolman] setup."
+            await self._log_n_send(msg)
+            return False
+
+        # first check if the spool is not already assigned to a machine
+        spool_info = await self.get_info_for_spool(spool_id)
+        if spool_info['location'] != "" :
+            if spool_info['location'].split(':')[0] == self.printer_info["hostname"] :
+                msg = f"Spool {spool_id} is already assigned to this machine @ slot {spool_info['location'].split(':')[1]}"
+                await self._log_n_send(msg)
+                if int(spool_info['location'].split(':')[1]) == slot :
+                    msg = f"Updating slot for spool {spool_id} to {slot}"
+                    await self._log_n_send(msg)
+            else :
+                msg = f"Spool {spool_id} is already assigned to another machine: {spool_info['location']}"
+                await self._log_n_send(msg)
+                return False
+
+        # then check that no spool is allready assigned to the slot of this machine
+        spools = await self.get_spools_for_machine(silent=True)
+        if spools not in [False, None]:
+            for spool in spools :
+                logging.info(f"found spool: {spool['filament']['name']} ")
+                if int(spool['location'].split(':')[1]) == slot :
+                    msg = f"Slot {slot} is already assigned to spool {spool['id']}"
+                    await self._log_n_send(msg)
+                    return False
+        else :
+            msg = f"Failed to retrieve spools for machine {self.printer_info['hostname']}"
+            await self._log_n_send(msg)
+            return False
+
+        #use the PATCH method on the spoolman api
+        #get current printer hostname
+        machine_hostname = self.printer_info["hostname"]
+        logging.info(f"Setting spool {spool_id} for machine: {machine_hostname} @ slot {slot}")
+        # get spool info from spoolman
+        spool_info = await self.get_info_for_spool(spool_id)
+        body = {
+            "location"         : f"{machine_hostname}:{slot}",
+        }
+        args ={
+            "request_method" : "PATCH",
+            "path" : f"/v1/spool/{spool_id}",
+            "body" : body,
+        }
+        webrequest = WebRequest(
+            endpoint = f"{self.spoolman_url}/spools/{spool_id}",
+            args=args,
+            action="PATCH",
+        )
+        try :
+            await self._proxy_spoolman_request(webrequest)
+        except Exception as e:
+            logging.error(f"Failed to set spool {spool_id} for machine {machine_hostname} @ slot {slot}: {e}")
+            await self._log_n_send(f"Failed to set spool {spool_id} for machine {machine_hostname}")
+            return False
+        await self._log_n_send(f"Spool {spool_id} set for machine {machine_hostname} @ slot {slot}")
+        return True
 
     async def check_filament(self):
         '''
