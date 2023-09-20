@@ -62,6 +62,9 @@ class UboeSpoolManager(SpoolManager):
         self.server.register_remote_method(
             "spoolman_check_filament", self.check_filament
         )
+        self.server.register_remote_method(
+            "spoolman_get_spools_for_machine", self.get_spools_for_machine
+        )
 
     async def _log_n_send(self, msg):
         ''' logs and sends msg to the klipper console'''
@@ -99,7 +102,11 @@ class UboeSpoolManager(SpoolManager):
             "spoolman:get_spool_info", {"spool_id": spool_id}
         )
         spool_info = await self.get_info_for_spool(spool_id)
-        msg = f"Active spool is: {spool_info}"
+        msg = f"Active spool is: {spool_info['filament']['name']} (id : {spool_info['id']})"
+        await self._log_n_send(msg)
+        msg = f"   used: {int(spool_info['used_weight'])} g"
+        await self._log_n_send(msg)
+        msg = f"   remaining: {int(spool_info['remaining_weight'])} g"
         await self._log_n_send(msg)
 
     async def _get_active_spool(self):
@@ -208,7 +215,12 @@ class UboeSpoolManager(SpoolManager):
         if not self.is_mmu and len(spools) > 1:
             await self._log_n_send(f"More than one spool assigned to machine: {machine_hostname} but MMU is not enabled")
             return False
-        await self._log_n_send(f"Spools for machine: {[spool['filament']['name'] for spool in spools]}")
+        await self._log_n_send(f"Spools for machine:")
+        for spool in spools:
+            index = spool['location'].split(machine_hostname+':')[1]
+            if not index :
+                self._log_n_send(f"location field for {spool['filament']['name']} @ {spool['id']} in spoolman db is not formatted correctly. Please check the spoolman setup.")
+            await self._log_n_send(f"   {spool['filament']['name']} (index : {spool['id']})")
         return spools
 
     async def check_filament(self):
