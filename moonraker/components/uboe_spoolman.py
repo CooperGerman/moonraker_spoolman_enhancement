@@ -53,7 +53,7 @@ class UboeSpoolManager(SpoolManager):
     '''
     def __init__(self, config: ConfigHelper):
         super().__init__(config)
-        self.filament_slots = config.getint("spoolman", "filament_slots", fallback=1)
+        self.filament_slots = config.getint("filament_slots", default=1, minval=1)
         if self.filament_slots < 1 :
             self._log_n_send(f"Number of filament slots is not set or is less than 1. Please check the spoolman or moonraker [spoolman] setup.")
         self.printer_info = self.server.get_host_info()
