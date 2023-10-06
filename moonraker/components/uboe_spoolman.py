@@ -69,7 +69,7 @@ class UboeSpoolManager(SpoolManager):
             "spoolman_get_spools_for_machine", self.get_spools_for_machine
         )
         self.server.register_remote_method(
-            "spoolman_set_spool_for_machine", self.set_spool_for_machine
+            "spoolman_set_spool_slot", self.set_spool_slot
         )
 
     async def _log_n_send(self, msg):
@@ -115,13 +115,30 @@ class UboeSpoolManager(SpoolManager):
             msg = f"No active spool set"
             await self._log_n_send(msg)
             return False
+
         spool_info = await self.get_info_for_spool(spool_id)
         msg = f"Active spool is: {spool_info['filament']['name']} (id : {spool_info['id']})"
         await self._log_n_send(msg)
-        msg = f"   used: {int(spool_info['used_weight'])} g"
+        msg = f"   - used: {int(spool_info['used_weight'])} g" # Special space characters used as they will be siplayed in gcode console
         await self._log_n_send(msg)
-        msg = f"   remaining: {int(spool_info['remaining_weight'])} g"
+        msg = f"   - remaining: {int(spool_info['remaining_weight'])} g" # Special space characters used as they will be siplayed in gcode console
         await self._log_n_send(msg)
+        # if spool_id not in filament_slots :
+        found = False
+        for spoolid in await self.get_spools_for_machine(silent=True):
+            await self._log_n_send(msg)
+            if int(spoolid['id']) == spool_id :
+                msg = "   - slot: {}".format(int(spool_info['location'].split(self.printer_info["hostname"]+':')[1])) # Special space characters used as they will be siplayed in gcode console
+                await self._log_n_send(msg)
+                found = True
+        if not found :
+            msg = f"Spool id {spool_id} is not assigned to this machine"
+            await self._log_n_send(msg)
+            msg = f"Run : "
+            await self._log_n_send(msg)
+            msg = f"   SET_SPOOL_SLOT ID={spool_id} SLOT=integer" # Special space characters used as they will be siplayed in gcode console
+            await self._log_n_send(msg)
+            return False
 
     async def _get_active_spool(self):
         spool_id = await self.database.get_item(
@@ -229,15 +246,18 @@ class UboeSpoolManager(SpoolManager):
         if self.filament_slots < len(spools) :
             if not silent : await self._log_n_send(f"Number of spools assigned to machine {machine_hostname} is greater than the number of slots available on the machine. Please check the spoolman or moonraker [spoolman] setup.")
             return False
-        if not silent : await self._log_n_send(f"Spools for machine:")
-        for spool in spools:
-            index = spool['location'].split(machine_hostname+':')[1]
-            if not index :
-                if not silent : self._log_n_send(f"location field for {spool['filament']['name']} @ {spool['id']} in spoolman db is not formatted correctly. Please check the spoolman setup.")
-            if not silent : await self._log_n_send(f"   {spool['filament']['name']} (index : {spool['id']})")
+        if spools:
+            if not silent : await self._log_n_send(f"Spools for machine:")
+            for spool in spools:
+                slot = spool['location'].split(machine_hostname+':')[1]
+                if not slot :
+                    if not silent : self._log_n_send(f"location field for {spool['filament']['name']} @ {spool['id']} in spoolman db is not formatted correctly. Please check the spoolman setup.")
+                if not silent : await self._log_n_send(f"   {spool['filament']['name']} (slot : {spool['id']})")
+        else :
+            if not silent : await self._log_n_send(f"No spools assigned to machine {machine_hostname}")
         return spools
 
-    async def set_spool_for_machine(self, spool_id : int, slot : int=None) -> bool:
+    async def set_spool_slot(self, spool_id : int, slot : int=None) -> bool:
         '''
         Sets the spool with id=id for the current machine into optional slot number if mmu is enabled.
 
@@ -254,7 +274,7 @@ class UboeSpoolManager(SpoolManager):
 
         logging.info(f"Setting spool {spool_id} for machine: {self.printer_info['hostname']} @ slot {slot}")
         self.server.send_event(
-            "spoolman:set_spool_for_machine", {"id": spool_id, "slot": slot}
+            "spoolman:spoolman_set_spool_slot", {"id": spool_id, "slot": slot}
         )
         # check that slot not higher than number of slots available
         if (slot == None) and (self.filament_slots > 1) :
@@ -396,7 +416,6 @@ class UboeSpoolManager(SpoolManager):
             if state not in ['paused', 'cancelled', 'complete', 'standby']:
                 await kapi.pause_print()
             return False
-
 
 def load_component(config: ConfigHelper) -> UboeSpoolManager:
     return UboeSpoolManager(config)
