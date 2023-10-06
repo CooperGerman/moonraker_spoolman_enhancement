@@ -111,6 +111,10 @@ class UboeSpoolManager(SpoolManager):
         self.server.send_event(
             "spoolman:get_spool_info", {"id": spool_id}
         )
+        if not spool_id :
+            msg = f"No active spool set"
+            await self._log_n_send(msg)
+            return False
         spool_info = await self.get_info_for_spool(spool_id)
         msg = f"Active spool is: {spool_info['filament']['name']} (id : {spool_info['id']})"
         await self._log_n_send(msg)
