@@ -21,6 +21,9 @@ The format is based on [Keep a Changelog].
 - **update_manager**: Added support for stable `git_repo` updates
 - **server**: Added a `--unixsocket` command line option
 - **server**: Command line options may also be specified as env variables
+- **server**: Added a `route_prefix` option
+- **webcam**: Webcam APIs can now specify cameras by `uid` or `name`
+- **deps**:  Added support for optional `msgspec` and `uvloop` packages
 
 ### Fixed
 
@@ -35,6 +38,7 @@ The format is based on [Keep a Changelog].
   transition.
 - **klippy_connection**:  Fixed a race condition that can result in
   skipped subscription updates.
+- **configheler**: Fixed inline comment parsing.
 
 ### Changed
 
@@ -55,6 +59,7 @@ The format is based on [Keep a Changelog].
   deprecated, new configurations should use the `system_dependencies` option.
 - **update_manager**: APIs that return status report additional fields.
   See the [API Documentation](./web_api.md#get-update-status) for details.
+- **proc_stats**: Improved performance of Raspberry Pi CPU throttle detection.
 
 ## [0.8.0] - 2023-02-23
 

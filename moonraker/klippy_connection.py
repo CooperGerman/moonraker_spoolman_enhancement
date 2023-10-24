@@ -9,11 +9,11 @@ from __future__ import annotations
 import os
 import time
 import logging
-import json
 import getpass
 import asyncio
 import pathlib
 from .utils import ServerError, get_unix_peer_credentials
+from .utils import json_wrapper as jsonw
 
 # Annotation imports
 from typing import (
@@ -180,7 +180,7 @@ class KlippyConnection:
                 continue
             errors_remaining = 10
             try:
-                decoded_cmd = json.loads(data[:-1])
+                decoded_cmd = jsonw.loads(data[:-1])
                 self._process_command(decoded_cmd)
             except Exception:
                 logging.exception(
@@ -193,7 +193,7 @@ class KlippyConnection:
         if self.writer is None or self.closing:
             request.set_exception(ServerError("Klippy Host not connected", 503))
             return
-        data = json.dumps(request.to_dict()).encode() + b"\x03"
+        data = jsonw.dumps(request.to_dict()) + b"\x03"
         try:
             self.writer.write(data)
             await self.writer.drain()
@@ -328,13 +328,13 @@ class KlippyConnection:
     async def _request_initial_subscriptions(self) -> None:
         try:
             await self.klippy_apis.subscribe_objects({'webhooks': None})
-        except ServerError as e:
+        except ServerError:
             logging.exception("Unable to subscribe to webhooks object")
         else:
             logging.info("Webhooks Subscribed")
         try:
             await self.klippy_apis.subscribe_gcode_output()
-        except ServerError as e:
+        except ServerError:
             logging.exception(
                 "Unable to register gcode output subscription"
             )
@@ -409,8 +409,7 @@ class KlippyConnection:
     async def _verify_klippy_requirements(self) -> None:
         result = await self.klippy_apis.get_object_list(default=None)
         if result is None:
-            logging.info(
-                f"Unable to retrieve Klipper Object List")
+            logging.info("Unable to retrieve Klipper Object List")
             return
         req_objs = set(["virtual_sdcard", "display_status", "pause_resume"])
         self._missing_reqs = req_objs - set(result)
@@ -425,7 +424,7 @@ class KlippyConnection:
             query_res = await self.klippy_apis.query_objects(
                 {'configfile': None}, default=None)
             if query_res is None:
-                logging.info(f"Unable to set SD Card path")
+                logging.info("Unable to set SD Card path")
             else:
                 config = query_res.get('configfile', {}).get('config', {})
                 vsd_config = config.get('virtual_sdcard', {})

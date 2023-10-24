@@ -11,11 +11,11 @@
 from __future__ import annotations
 from enum import Enum
 import logging
-import json
 import asyncio
 import serial_asyncio
 from tornado.httpclient import AsyncHTTPClient
 from tornado.httpclient import HTTPRequest
+from ..utils import json_wrapper as jsonw
 
 # Annotation imports
 from typing import (
@@ -293,7 +293,7 @@ class StripHttp(Strip):
             request = HTTPRequest(url=self.url,
                                   method="POST",
                                   headers=headers,
-                                  body=json.dumps(state),
+                                  body=jsonw.dumps(state),
                                   connect_timeout=self.timeout,
                                   request_timeout=self.timeout)
             for i in range(retries):
@@ -329,7 +329,7 @@ class StripSerial(Strip):
 
             logging.debug(f"WLED: serial:{self.serialport} json:{state}")
 
-            self.ser.write(json.dumps(state).encode())
+            self.ser.write(jsonw.dumps(state))
 
     def close(self: StripSerial):
         if hasattr(self, 'ser'):
@@ -466,7 +466,8 @@ class WLED:
         if status is None and preset == -1 and brightness == -1 and \
            intensity == -1 and speed == -1:
             logging.info(
-                f"Invalid state received but no control or preset data passed")
+                "Invalid state received but no control or preset data passed"
+            )
             return
 
         if strip not in self.strips:

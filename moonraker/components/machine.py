@@ -8,7 +8,6 @@ from __future__ import annotations
 import sys
 import os
 import re
-import json
 import pathlib
 import logging
 import asyncio
@@ -23,6 +22,7 @@ import getpass
 import configparser
 from ..confighelper import FileSourceWrapper
 from ..utils import source_info
+from ..utils import json_wrapper as jsonw
 
 # Annotation imports
 from typing import (
@@ -104,7 +104,7 @@ class Machine:
         self._public_ip = ""
         self.system_info: Dict[str, Any] = {
             'python': {
-                "version": sys.version_info,
+                "version": tuple(sys.version_info),
                 "version_string": sys.version.replace("\n", " ")
             },
             'cpu_info': self._get_cpu_info(),
@@ -202,7 +202,7 @@ class Machine:
             else:
                 for key, val in info.items():
                     sys_info_msg += f"\n  {key}: {val}"
-        sys_info_msg += f"\n\n***Allowed Services***"
+        sys_info_msg += "\n\n***Allowed Services***"
         for svc in self._allowed_services:
             sys_info_msg += f"\n  {svc}"
         self.server.add_log_rollover_item('system_info', sys_info_msg, log=log)
@@ -625,7 +625,7 @@ class Machine:
         try:
             # get network interfaces
             resp = await self.addr_cmd.run_with_response(log_complete=False)
-            decoded: List[Dict[str, Any]] = json.loads(resp)
+            decoded: List[Dict[str, Any]] = jsonw.loads(resp)
             for interface in decoded:
                 if interface['operstate'] != "UP":
                     continue
@@ -2003,7 +2003,7 @@ class InstallValidator:
             await self._check_configuration()
         except asyncio.CancelledError:
             raise
-        except Exception as e:
+        except Exception:
             logging.exception(f"{name} validation failed")
             raise self.server.error(
                 f"{name} validation failed", 500

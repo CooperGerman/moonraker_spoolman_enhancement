@@ -23,7 +23,7 @@ from . import confighelper
 from .eventloop import EventLoop
 from .app import MoonrakerApp
 from .klippy_connection import KlippyConnection
-from .utils import ServerError, Sentinel, get_software_info
+from .utils import ServerError, Sentinel, get_software_info, json_wrapper
 from .loghelper import LogManager
 
 # Annotation imports
@@ -368,7 +368,7 @@ class Server:
         return self.klippy_connection.state
 
     def _handle_term_signal(self) -> None:
-        logging.info(f"Exiting with signal SIGTERM")
+        logging.info("Exiting with signal SIGTERM")
         self.event_loop.register_callback(self._stop_server, "terminate")
 
     async def _stop_server(self, exit_reason: str = "restart") -> None:
@@ -585,6 +585,8 @@ def main(from_package: bool = True) -> None:
     else:
         app_args["log_file"] = str(data_path.joinpath("logs/moonraker.log"))
     app_args["python_version"] = sys.version.replace("\n", " ")
+    app_args["msgspec_enabled"] = json_wrapper.MSGSPEC_ENABLED
+    app_args["uvloop_enabled"] = EventLoop.UVLOOP_ENABLED
     log_manager = LogManager(app_args, startup_warnings)
 
     # Start asyncio event loop and server

@@ -23,7 +23,6 @@ from .utils import ServerError
 from typing import (
     TYPE_CHECKING,
     Any,
-    Awaitable,
     Optional,
     Callable,
     Coroutine,
@@ -327,9 +326,7 @@ class WebSocket(WebSocketHandler, BaseRemoteConnection):
             extensions.remove_agent(self)
         self.wsm.remove_client(self)
 
-    async def write_to_socket(
-        self, message: Union[str, Dict[str, Any]]
-    ) -> None:
+    async def write_to_socket(self, message: Union[bytes, str]) -> None:
         try:
             await self.write_message(message)
         except WebSocketClosedError:

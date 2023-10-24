@@ -7,7 +7,6 @@
 from __future__ import annotations
 import os
 import asyncio
-import json
 import logging
 import time
 import pathlib
@@ -19,6 +18,7 @@ import tempfile
 from queue import SimpleQueue
 from ..loghelper import LocalQueueHandler
 from ..common import Subscribable, WebRequest
+from ..utils import json_wrapper as jsonw
 
 from typing import (
     TYPE_CHECKING,
@@ -222,8 +222,7 @@ class SimplyPrint(Subscribable):
                 timediff = curtime - self.last_err_log_time
                 if timediff > CONNECTION_ERROR_LOG_TIME:
                     self.last_err_log_time = curtime
-                    logging.exception(
-                        f"Failed to connect to SimplyPrint")
+                    logging.exception("Failed to connect to SimplyPrint")
             else:
                 logging.info("Connected to SimplyPrint Cloud")
                 await self._read_messages()
@@ -261,8 +260,8 @@ class SimplyPrint(Subscribable):
     def _process_message(self, msg: str) -> None:
         self._logger.info(f"received: {msg}")
         try:
-            packet: Dict[str, Any] = json.loads(msg)
-        except json.JSONDecodeError:
+            packet: Dict[str, Any] = jsonw.loads(msg)
+        except jsonw.JSONDecodeError:
             logging.debug(f"Invalid message, not JSON: {msg}")
             return
         event: str = packet.get("type", "")
@@ -306,7 +305,7 @@ class SimplyPrint(Subscribable):
                 logging.debug(f"Invalid token received: {token}")
                 token = None
             else:
-                logging.info(f"SimplyPrint Token Received")
+                logging.info("SimplyPrint Token Received")
             self.save_item("printer_token", token)
             self._set_ws_url()
             if "short_id" in data:
@@ -323,14 +322,14 @@ class SimplyPrint(Subscribable):
                 return
             printer_id = data.get("printer_id")
             if printer_id is None:
-                logging.debug(f"Invalid printer id, received null (None) value")
+                logging.debug("Invalid printer id, received null (None) value")
             self.save_item("printer_id", str(printer_id))
             self._set_ws_url()
             self.save_item("temp_short_setup_id", None)
             self.eventloop.create_task(self._remove_setup_announcement())
         elif event == "demand":
             if data is None:
-                logging.debug(f"Invalid message, no data")
+                logging.debug("Invalid message, no data")
                 return
             demand = data.pop("demand", "unknown")
             self._process_demand(demand, data)
@@ -369,7 +368,7 @@ class SimplyPrint(Subscribable):
         elif demand == "file":
             url: Optional[str] = args.get("url")
             if not isinstance(url, str):
-                logging.debug(f"Invalid url in message")
+                logging.debug("Invalid url in message")
                 return
             start = bool(args.get("auto_start", 0))
             self.print_handler.download_file(url, start)
@@ -1085,7 +1084,7 @@ class SimplyPrint(Subscribable):
     async def _send_wrapper(self, packet: Dict[str, Any]) -> bool:
         try:
             assert self.ws is not None
-            await self.ws.write_message(json.dumps(packet))
+            await self.ws.write_message(jsonw.dumps(packet))
         except Exception:
             return False
         else:
@@ -1399,7 +1398,7 @@ class WebcamStream:
                 self.simplyprint.send_sp("stream", {"base": img})
         except asyncio.CancelledError:
             raise
-        except Exception as e:
+        except Exception:
             if not self.server.is_verbose_enabled():
                 return
             logging.exception("SimplyPrint WebCam Stream Error")

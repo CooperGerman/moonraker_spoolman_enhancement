@@ -65,12 +65,18 @@ class AsyncRunner:
 class ZeroconfRegistrar:
     def __init__(self, config: ConfigHelper) -> None:
         self.server = config.get_server()
-        self.runner = AsyncRunner(IPVersion.All)
         hi = self.server.get_host_info()
         self.mdns_name = config.get("mdns_hostname", hi["hostname"])
         addr: str = hi["address"]
+        self.ip_version = IPVersion.All
         if addr.lower() == "all":
             addr = "::"
+        else:
+            addr_obj = ipaddress.ip_address(addr)
+            self.ip_version = (
+                IPVersion.V4Only if addr_obj.version == 4 else IPVersion.V6Only
+            )
+        self.runner = AsyncRunner(self.ip_version)
         self.cfg_addr = addr
         self.bound_all = addr in ["0.0.0.0", "::"]
         if self.bound_all:
@@ -100,7 +106,8 @@ class ZeroconfRegistrar:
         zc_service_props = {
             "uuid": instance_uuid,
             "https_port": hi["ssl_port"] if app.https_enabled() else "",
-            "version": app_args["software_version"]
+            "version": app_args["software_version"],
+            "route_prefix": app.route_prefix
         }
         if self.bound_all:
             if not host:
@@ -111,8 +118,7 @@ class ZeroconfRegistrar:
             if not host:
                 host = self.cfg_addr
             host_addr = ipaddress.ip_address(self.cfg_addr)
-            fam = socket.AF_INET6 if host_addr.version == 6 else socket.AF_INET
-            addresses = [(socket.inet_pton(fam, str(self.cfg_addr)))]
+            addresses = [host_addr.packed]
         zc_service_name = f"{instance_name} @ {host}.{ZC_SERVICE_TYPE}"
         server_name = self.mdns_name or instance_name.lower()
         self.service_info = AsyncServiceInfo(
@@ -150,9 +156,14 @@ class ZeroconfRegistrar:
             for addr_info in ifinfo["ip_addresses"]:
                 if addr_info["is_link_local"]:
                     continue
-                is_ipv6 = addr_info['family'] == "ipv6"
-                family = socket.AF_INET6 if is_ipv6 else socket.AF_INET
-                yield socket.inet_pton(family, addr_info["address"])
+                addr_obj = ipaddress.ip_address(addr_info["address"])
+                ver = addr_obj.version
+                if (
+                    (self.ip_version == IPVersion.V4Only and ver == 6) or
+                    (self.ip_version == IPVersion.V6Only and ver == 4)
+                ):
+                    continue
+                yield addr_obj.packed
 
 
 SSDP_ADDR = ("239.255.255.250", 1900)
@@ -272,7 +283,8 @@ class SSDPServer(asyncio.protocols.DatagramProtocol):
         if len(name) > 64:
             name = name[:64]
         self.name = name
-        self.base_url = f"http://{host_name_or_ip}:{port}"
+        app: MoonrakerApp = self.server.lookup_component("application")
+        self.base_url = f"http://{host_name_or_ip}:{port}{app.route_prefix}"
         self.response_headers = [
             f"USN: uuid:{self.unique_id}::upnp:rootdevice",
             f"LOCATION: {self.base_url}/server/zeroconf/ssdp",
@@ -334,7 +346,7 @@ class SSDPServer(asyncio.protocols.DatagramProtocol):
         try:
             parts = data.decode().split("\r\n\r\n", maxsplit=1)
             header = parts[0]
-        except ValueError as e:
+        except ValueError:
             logging.exception("Data Decode Error")
             return
         hlines = header.splitlines()

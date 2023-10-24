@@ -323,6 +323,7 @@ class PrusaSlicer(BaseSlicer):
             'PrusaSlicer': r"PrusaSlicer\s(.*)\son",
             'SuperSlicer': r"SuperSlicer\s(.*)\son",
             'OrcaSlicer': r"OrcaSlicer\s(.*)\son",
+            'MomentSlicer': r"MomentSlicer\s(.*)\son",
             'SliCR-3D': r"SliCR-3D\s(.*)\son",
             'BambuStudio': r"BambuStudio[^ ]*\s(.*)\n",
             'A3dp-Slicer': r"A3dp-Slicer\s(.*)\son",
@@ -568,7 +569,7 @@ class Cura(BaseSlicer):
                     'relative_path': rel_path_full
                 })
                 # Create 32x32 thumbnail
-                im.thumbnail((32, 32), Image.ANTIALIAS)
+                im.thumbnail((32, 32), Image.Resampling.LANCZOS)
                 im.save(thumb_path_small, format="PNG")
                 thumbs.insert(0, {
                     'width': im.width, 'height': im.height,
