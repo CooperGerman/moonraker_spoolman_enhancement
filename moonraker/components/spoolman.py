@@ -8,12 +8,13 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
-import os
+import os, sys
 from typing import TYPE_CHECKING, Dict, Any
+from .file_manager.metadata import extract_metadata
+from moonraker.websockets import WebRequest
 
 if TYPE_CHECKING:
     from typing import Optional
-    from moonraker.websockets import WebRequest
     from moonraker.components.http_client import HttpClient
     from moonraker.components.database import MoonrakerDatabase
     from .klippy_apis import KlippyAPI as APIComp
@@ -399,7 +400,7 @@ class SpoolManager:
                     if not silent : self._log_n_send(f"location field for {spool['filament']['name']} @ {spool['id']} in spoolman db is not formatted correctly. Please check the spoolman setup.")
                 if not silent : await self._log_n_send(f"   {spool['filament']['name']} (slot : {spool['id']})")
         else :
-            if not silent : await self._log_n_send(f"No spools assigned to machine {machine_hostname}")
+            if not silent : await self._log_n_send(f"No spools assigned to machine: {machine_hostname}")
         return spools
 
     async def set_spool_slot(self, spool_id : int, slot : int=None) -> bool:
@@ -542,8 +543,6 @@ class SpoolManager:
             return False
         spools = ret
         if not spools:
-            msg = f"No spools assigned to machine: {self.printer_info['hostname']}"
-            await self._log_n_send(msg)
             return False
 
         ret = await self.verify_consistency(metadata, spools)
