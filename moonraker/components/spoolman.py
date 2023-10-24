@@ -86,6 +86,7 @@ class SpoolManager:
         self.server.register_notification("spoolman:active_spool_set")
         self.server.register_notification("spoolman:get_spool_info")
         self.server.register_notification("spoolman:check_filament")
+        self.server.register_notification("spoolman:check_failure")
 
     def _register_listeners(self):
         self.server.register_event_handler(
@@ -102,6 +103,11 @@ class SpoolManager:
             "/server/spoolman/proxy",
             ["POST"],
             self._proxy_spoolman_request,
+        )
+        self.server.register_endpoint(
+            "/filament/info",
+            ["GET"],
+            self.__spool_info_notificator,
         )
 
     async def component_init(self) -> None:
@@ -277,7 +283,7 @@ class SpoolManager:
         for spoolid in await self.get_spools_for_machine(silent=True):
             await self._log_n_send(msg)
             if int(spoolid['id']) == spool_id :
-                msg = "{CONSOLE_TAB}- slot: {}".format(int(spool_info['location'].split(self.printer_info["hostname"]+':')[1])) # Special space characters used as they will be siplayed in gcode console
+                msg = "{}- slot: {}".format(CONSOLE_TAB, int(spool_info['location'].split(self.printer_info["hostname"]+':')[1])) # Special space characters used as they will be siplayed in gcode console
                 await self._log_n_send(msg)
                 found = True
         if not found :
@@ -587,9 +593,6 @@ class SpoolManager:
         Uses metadata from the gcode to identify the filaments and runs some verifications
         based on the filament type and the amount of filament left in spoolman db.
         '''
-        self.server.send_event(
-            "spoolman:check_filament", {}
-        )
         logging.info(f"Checking filament")
         await self._log_n_send("="*32)
         await self._log_n_send(f"Checking filament consistency: ")
@@ -597,6 +600,9 @@ class SpoolManager:
         # verify that klipper is ready
         if self.server.get_klippy_state() != "ready":
             logging.error(f"Klippy not ready")
+            self.server.send_event(
+                "spoolman:check_failure", {"message" : "Klippy not ready"}
+            )
             return False
         kapi: KlippyAPI = self.server.lookup_component("klippy_apis")
         kapi.pause_print()
@@ -606,9 +612,11 @@ class SpoolManager:
         except Exception:
             # Klippy not connected
             logging.error(f"Klippy not retrieve virtual_sdcard or print_stats")
+            self.server.send_event(
+                "spoolman:check_failure", {"message" : f"Klippy not retrieve virtual_sdcard or print_stats"}
+            )
             return False
 
-        is_active = virtual_sdcard["virtual_sdcard"]['is_active']
         filename = os.path.join('/home', 'uboe', 'printer_data', 'gcodes', print_stats["print_stats"]["filename"])
         state = print_stats["print_stats"]["state"]
 
@@ -616,11 +624,17 @@ class SpoolManager:
             # No print active
             msg = f"No print active, cannot get gcode from file (state: {state})"
             await self._log_n_send(msg)
+            self.server.send_event(
+                "spoolman:check_failure", {"message" : msg}
+            )
             return False
 
         # Get gcode from file
         if filename is None:
             logging.error(f"Filename is None")
+            self.server.send_event(
+                "spoolman:check_failure", {"message" : "Filename is None"}
+            )
             return False
 
         metadata: Dict[str, Any] = {}
@@ -637,6 +651,9 @@ class SpoolManager:
         if active_spool is None:
             msg = f"No active spool set"
             await self._log_n_send(msg)
+            self.server.send_event(
+                "spoolman:check_failure", {"message" : msg}
+            )
             return False
         spools = await self.get_spools_for_machine(silent=True)
         found = False
@@ -653,11 +670,19 @@ class SpoolManager:
         if ret == False:
             if state not in ['paused', 'cancelled', 'complete', 'standby']:
                 await kapi.pause_print()
+            msg = f"Failed to retrieve spools from spoolman"
+            self.server.send_event(
+                "spoolman:check_failure", {"message" : msg}
+            )
             return False
         spools = ret
         if not spools:
             if state not in ['paused', 'cancelled', 'complete', 'standby']:
                 await kapi.pause_print()
+            msg = f"No spools assigned to machine {self.printer_info['hostname']}"
+            self.server.send_event(
+                "spoolman:check_failure", {"message" : msg}
+            )
             return False
 
         ret = await self.verify_consistency(metadata, spools)
@@ -667,14 +692,24 @@ class SpoolManager:
             kapi.resume_print()
             return True
         else :
-            msg = f"FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED! PAUSING PRINT."
-            await self._log_n_send(msg)
-            msg = f"Please check the spoolman setup and physical spools to match the slicer setup."
-            await self._log_n_send(msg)
+            msg1 = f"FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED! PAUSING PRINT."
+            await self._log_n_send(msg1)
+            msg2 = f"Please check the spoolman setup and physical spools to match the slicer setup."
+            await self._log_n_send(msg2)
             #if printer is runnning, pause it
             if state not in ['paused', 'cancelled', 'complete', 'standby']:
                 await kapi.pause_print()
+            self.server.send_event(
+                "spoolman:check_failure", {"message" : msg1+msg2}
+            )
             return False
+
+    async def __spool_info_notificator(self, web_request: WebRequest):
+        '''
+        Sends spool info when requested by a webrequest
+        '''
+        spool_id = await self._get_active_spool()
+        return await self.get_info_for_spool(spool_id)
 
 def load_component(config: ConfigHelper) -> SpoolManager:
     return SpoolManager(config)
