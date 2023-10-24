@@ -401,6 +401,7 @@ class SpoolManager:
                 if not silent : await self._log_n_send(f"   {spool['filament']['name']} (slot : {spool['id']})")
         else :
             if not silent : await self._log_n_send(f"No spools assigned to machine: {machine_hostname}")
+            return False
         return spools
 
     async def set_spool_slot(self, spool_id : int, slot : int=None) -> bool:
@@ -540,9 +541,13 @@ class SpoolManager:
         # Get spools assigned to current machine
         ret = await self.get_spools_for_machine()
         if ret == False:
+            if state not in ['paused', 'cancelled', 'complete', 'standby']:
+                await kapi.pause_print()
             return False
         spools = ret
         if not spools:
+            if state not in ['paused', 'cancelled', 'complete', 'standby']:
+                await kapi.pause_print()
             return False
 
         ret = await self.verify_consistency(metadata, spools)
