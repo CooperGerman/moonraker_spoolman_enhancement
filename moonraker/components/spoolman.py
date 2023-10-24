@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 DB_NAMESPACE = "moonraker"
 ACTIVE_SPOOL_KEY = "spoolman.spool_id"
-
+CONSOLE_TAB="   " # Special space characters used as they will be siplayed in gcode console
 
 class SpoolManager:
     spool_id: Optional[int] = None
@@ -77,6 +77,9 @@ class SpoolManager:
         )
         self.server.register_remote_method(
             "spoolman_set_spool_slot", self.set_spool_slot
+        )
+        self.server.register_remote_method(
+            "spoolman_clear_spool_slots", self.clear_spool_slots
         )
 
     def _register_notifications(self):
@@ -265,16 +268,16 @@ class SpoolManager:
         spool_info = await self.get_info_for_spool(spool_id)
         msg = f"Active spool is: {spool_info['filament']['name']} (id : {spool_info['id']})"
         await self._log_n_send(msg)
-        msg = f"   - used: {int(spool_info['used_weight'])} g" # Special space characters used as they will be siplayed in gcode console
+        msg = f"{CONSOLE_TAB}- used: {int(spool_info['used_weight'])} g" # Special space characters used as they will be siplayed in gcode console
         await self._log_n_send(msg)
-        msg = f"   - remaining: {int(spool_info['remaining_weight'])} g" # Special space characters used as they will be siplayed in gcode console
+        msg = f"{CONSOLE_TAB}- remaining: {int(spool_info['remaining_weight'])} g" # Special space characters used as they will be siplayed in gcode console
         await self._log_n_send(msg)
         # if spool_id not in filament_slots :
         found = False
         for spoolid in await self.get_spools_for_machine(silent=True):
             await self._log_n_send(msg)
             if int(spoolid['id']) == spool_id :
-                msg = "   - slot: {}".format(int(spool_info['location'].split(self.printer_info["hostname"]+':')[1])) # Special space characters used as they will be siplayed in gcode console
+                msg = "{CONSOLE_TAB}- slot: {}".format(int(spool_info['location'].split(self.printer_info["hostname"]+':')[1])) # Special space characters used as they will be siplayed in gcode console
                 await self._log_n_send(msg)
                 found = True
         if not found :
@@ -282,7 +285,7 @@ class SpoolManager:
             await self._log_n_send(msg)
             msg = f"Run : "
             await self._log_n_send(msg)
-            msg = f"   SET_SPOOL_SLOT ID={spool_id} SLOT=integer" # Special space characters used as they will be siplayed in gcode console
+            msg = f"{CONSOLE_TAB}SET_SPOOL_SLOT ID={spool_id} SLOT=integer" # Special space characters used as they will be siplayed in gcode console
             await self._log_n_send(msg)
             return False
 
@@ -344,9 +347,9 @@ class SpoolManager:
             else :
                 # if filament name from slicer is not the same as the one in spoolman db
                 if sb_tools[tool_id]['filament']['name'] != filament['name']:
-                    msg = f"Filament mismatch spoolman vs slicer @id {tool_id}: {sb_tools[tool_id]['filament']['name']} != {filament['name']}"
+                    await self._log_n_send(f"Filament mismatch spoolman vs slicer @id {tool_id}")
+                    await self._log_n_send(f"{CONSOLE_TAB}- {sb_tools[tool_id]['filament']['name']} != {filament['name']}")
                     mismatch = True
-                    await self._log_n_send(msg)
 
         if mismatch:
             return False
@@ -398,11 +401,51 @@ class SpoolManager:
                 slot = spool['location'].split(machine_hostname+':')[1]
                 if not slot :
                     if not silent : self._log_n_send(f"location field for {spool['filament']['name']} @ {spool['id']} in spoolman db is not formatted correctly. Please check the spoolman setup.")
-                if not silent : await self._log_n_send(f"   {spool['filament']['name']} (slot : {spool['id']})")
+                if not silent : await self._log_n_send(f"{CONSOLE_TAB}- {spool['filament']['name']} (slot : {slot})")
         else :
             if not silent : await self._log_n_send(f"No spools assigned to machine: {machine_hostname}")
             return False
         return spools
+
+    async def unset_spool_slot(self, spool_id : int) -> bool:
+        '''
+        Removes the machine:slot allocation in spoolman db for spool_id
+
+        parameters:
+            @param spool_id: id of the spool to set
+        returns:
+            @return: True if successful, False otherwise
+        '''
+        if spool_id == None :
+            await self._log_n_send(f"Trying to unset spool but no spool id provided.")
+            return False
+
+        #use the PATCH method on the spoolman api
+        #get current printer hostname
+        machine_hostname = self.printer_info["hostname"]
+        logging.info(f"Unsetting spool {spool_id} for machine: {machine_hostname}")
+        # get spool info from spoolman
+        body = {
+            "location"         : "",
+        }
+        args ={
+            "request_method" : "PATCH",
+            "path" : f"/v1/spool/{spool_id}",
+            "body" : body,
+        }
+        webrequest = WebRequest(
+            endpoint = f"{self.spoolman_url}/spools/{spool_id}",
+            args=args,
+            action="PATCH",
+        )
+        try :
+            await self._proxy_spoolman_request(webrequest)
+        except Exception as e:
+            logging.error(f"Failed to unset spool {spool_id} for machine {machine_hostname}: {e}")
+            await self._log_n_send(f"Failed to unset spool {spool_id} for machine {machine_hostname}")
+            return False
+        await self._log_n_send(f"OLIVIER")
+        return True
 
     async def set_spool_slot(self, spool_id : int, slot : int=None) -> bool:
         '''
@@ -437,29 +480,33 @@ class SpoolManager:
 
         # first check if the spool is not already assigned to a machine
         spool_info = await self.get_info_for_spool(spool_id)
-        if spool_info['location'] != "" :
-            if spool_info['location'].split(':')[0] == self.printer_info["hostname"] :
-                msg = f"Spool {spool_id} is already assigned to this machine @ slot {spool_info['location'].split(':')[1]}"
-                await self._log_n_send(msg)
-                if int(spool_info['location'].split(':')[1]) == slot :
-                    msg = f"Updating slot for spool {spool_id} to {slot}"
-                    await self._log_n_send(msg)
-            else :
-                msg = f"Spool {spool_id} is already assigned to another machine: {spool_info['location']}"
-                await self._log_n_send(msg)
-                return False
+        if 'location' in spool_info:
+            if spool_info['location'] != "" :
+                if spool_info['location'].split(':')[0] == self.printer_info["hostname"] :
+                    await self._log_n_send(f"Spool {spool_id} is already assigned to this machine @ slot {spool_info['location'].split(':')[1]}")
+                    if int(spool_info['location'].split(':')[1]) == slot :
+                        await self._log_n_send(f"Updating slot for spool {spool_id} to {slot}")
+                else :
+                    await self._log_n_send(f"Spool {spool_id} is already assigned to another machine: {spool_info['location']}")
+                    return False
 
-        # then check that no spool is allready assigned to the slot of this machine
+        # then check that no spool is already assigned to the slot of this machine
         spools = await self.get_spools_for_machine(silent=True)
         if spools not in [False, None]:
             for spool in spools :
                 logging.info(f"found spool: {spool['filament']['name']} ")
                 if int(spool['location'].split(':')[1]) == slot :
-                    msg = f"Slot {slot} is already assigned to spool {spool['id']}"
-                    await self._log_n_send(msg)
-                    return False
-        else :
-            msg = f"Failed to retrieve spools for machine {self.printer_info['hostname']}"
+                    await self._log_n_send(f"Slot {slot} is already assigned to spool {spool['id']}")
+                    await self._log_n_send(f"{CONSOLE_TAB}- Overwriting slot assignment")
+                    if not await self.unset_spool_slot(spool['id']) :
+                        await self._log_n_send(f"{CONSOLE_TAB*2}Failed to unset spool {spool['id']} from slot {slot}")
+                        return False
+                    else :
+                        await self._log_n_send(f"{CONSOLE_TAB*2}Spool {spool['id']} unset from slot {slot}")
+
+        # Check if spool is not allready archived
+        if spool_info['archived'] :
+            msg = f"Spool {spool_id} is archived. Please check the spoolman setup."
             await self._log_n_send(msg)
             return False
 
@@ -491,6 +538,50 @@ class SpoolManager:
         await self._log_n_send(f"Spool {spool_id} set for machine {machine_hostname} @ slot {slot}")
         return True
 
+    async def clear_spool_slots(self) -> bool:
+        '''
+        Clears all slots for the current machine
+        '''
+        logging.info(f"Clearing spool slots for machine: {self.printer_info['hostname']}")
+        self.server.send_event(
+            "spoolman:clear_spool_slots", {}
+        )
+        # get spools assigned to current machine
+        spools = await self.get_spools_for_machine(silent=True)
+        if spools not in [False, None]:
+            for spool in spools :
+                #use the PATCH method on the spoolman api
+                #get current printer hostname
+                machine_hostname = self.printer_info["hostname"]
+                logging.info(f"Clearing spool {spool['id']} for machine: {machine_hostname}")
+                # get spool info from spoolman
+                __ = await self.get_info_for_spool(spool['id'])
+                body = {
+                    "location"         : "",
+                }
+                args ={
+                    "request_method" : "PATCH",
+                    "path" : f"/v1/spool/{spool['id']}",
+                    "body" : body,
+                }
+                webrequest = WebRequest(
+                    endpoint = f"{self.spoolman_url}/spools/{spool['id']}",
+                    args=args,
+                    action="PATCH",
+                )
+                try :
+                    await self._proxy_spoolman_request(webrequest)
+                except Exception as e:
+                    logging.error(f"Failed to clear spool {spool['id']} for machine {machine_hostname}: {e}")
+                    await self._log_n_send(f"Failed to clear spool {spool['id']} for machine {machine_hostname}")
+                    return False
+                await self._log_n_send(f"Spool {spool['id']} cleared for machine {machine_hostname}")
+            return True
+        else :
+            msg = f"No spools for machine {self.printer_info['hostname']}"
+            await self._log_n_send(msg)
+            return False
+
     async def check_filament(self):
         '''
         Uses metadata from the gcode to identify the filaments and runs some verifications
@@ -500,6 +591,9 @@ class SpoolManager:
             "spoolman:check_filament", {}
         )
         logging.info(f"Checking filament")
+        await self._log_n_send("="*32)
+        await self._log_n_send(f"Checking filament consistency: ")
+        await self._log_n_send("="*32)
         # verify that klipper is ready
         if self.server.get_klippy_state() != "ready":
             logging.error(f"Klippy not ready")
@@ -537,6 +631,22 @@ class SpoolManager:
             metadata = extract_metadata(filename, False)
         except Exception:
             raise Exception(f"Failed to extract metadata from {filename}")
+
+        # check that active spool is in machine's slots
+        active_spool = await self._get_active_spool()
+        if active_spool is None:
+            msg = f"No active spool set"
+            await self._log_n_send(msg)
+            return False
+        spools = await self.get_spools_for_machine(silent=True)
+        found = False
+        for spool in spools :
+            if int(spool['id']) == active_spool :
+                found = True
+        if not found :
+            await self._log_n_send(f"Active spool {active_spool} is not assigned to this machine")
+            await self._log_n_send(f"Run : ")
+            await self._log_n_send(f"{CONSOLE_TAB}SET_SPOOL_SLOT ID={active_spool} SLOT=integer")
 
         # Get spools assigned to current machine
         ret = await self.get_spools_for_machine()
