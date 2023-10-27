@@ -450,7 +450,6 @@ class SpoolManager:
             logging.error(f"Failed to unset spool {spool_id} for machine {machine_hostname}: {e}")
             await self._log_n_send(f"Failed to unset spool {spool_id} for machine {machine_hostname}")
             return False
-        await self._log_n_send(f"OLIVIER")
         return True
 
     async def set_spool_slot(self, spool_id : int, slot : int=None) -> bool:
