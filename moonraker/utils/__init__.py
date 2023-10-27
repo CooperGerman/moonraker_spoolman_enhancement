@@ -64,7 +64,7 @@ def _run_git_command(cmd: str) -> str:
 def _retrieve_git_tag(source_path: str) -> str:
     cmd = f"git -C {source_path} rev-list --tags --max-count=1"
     hash = _run_git_command(cmd)
-    cmd = f"git -C {source_path} describe --tags {hash}"
+    cmd = f"git -C {source_path} describe --tags {hash} --always"
     tag = _run_git_command(cmd)
     cmd = f"git -C {source_path} rev-list {tag}..HEAD --count"
     count = _run_git_command(cmd)
