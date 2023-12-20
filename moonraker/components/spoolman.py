@@ -129,6 +129,25 @@ class SpoolManager:
 
     def _eposition_from_status(self, status: Dict[str, Any]) -> Optional[float]:
         position = status.get("toolhead", {}).get("position", [])
+        extruder = status.get("toolhead", {}).get("extruder", None)
+        if extruder is None: # create a failre
+            self.server.send_event(
+                "spoolman:check_failure", {"message" : "extruder not found in toolhead status"}
+            )
+
+        for spool in self.slot_occupation:
+            ext = 0 if extruder == "extruder" else (int(extruder.split('extruder')[1]) - 1)
+            if int(spool['location'].split(':')[1]) == ext :
+                self.server.send_event(
+                    "spoolman:active_spool_set", {"spool_id": spool['id']}
+                )
+                logging.info(f"Setting active spool to: {spool['id']}")
+                self.spool_id = spool['id']
+                self.set_active_spool(spool['id'])
+                break
+            else :
+                logging.info(f"Couldnt find a spool for extruder {extruder} in slot {ext}")
+
         return position[3] if len(position) > 3 else None
 
     async def _handle_status_update(self, status: Dict[str, Any], _: float) -> None:
@@ -283,7 +302,7 @@ class SpoolManager:
         await self._log_n_send(msg)
         # if spool_id not in filament_slots :
         found = False
-        for spoolid in await self.get_spools_for_machine(silent=True):
+        for spoolid in self.slot_occupation:
             await self._log_n_send(msg)
             if int(spoolid['id']) == spool_id :
                 msg = "{}- slot: {}".format(CONSOLE_TAB, int(spool_info['location'].split(self.printer_info["hostname"]+':')[1])) # Special space characters used as they will be siplayed in gcode console
@@ -377,7 +396,7 @@ class SpoolManager:
 
         return True
 
-    async def get_spools_for_machine(self, silent=False) -> List[Dict[str, Any]]:
+    async def get_spools_for_machine(self, silent=False) -> [Dict[str, Any]]:
         '''
         Gets all spools assigned to the current machine
         '''
@@ -499,7 +518,7 @@ class SpoolManager:
                     return False
 
         # then check that no spool is already assigned to the slot of this machine
-        spools = await self.get_spools_for_machine(silent=True)
+        spools = self.slot_occupation
         if spools not in [False, None]:
             for spool in spools :
                 logging.info(f"found spool: {spool['filament']['name']} ")
@@ -555,7 +574,7 @@ class SpoolManager:
             "spoolman:clear_spool_slots", {}
         )
         # get spools assigned to current machine
-        spools = await self.get_spools_for_machine(silent=True)
+        spools = self.slot_occupation
         if spools not in [False, None]:
             for spool in spools :
                 #use the PATCH method on the spoolman api
@@ -606,7 +625,7 @@ class SpoolManager:
                 "spoolman:check_failure", {"message" : "Klippy not ready"}
             )
             return False
-        kapi: KlippyAPI = self.server.lookup_component("klippy_apis")
+        kapi: APIComp = self.server.lookup_component("klippy_apis")
         kapi.pause_print()
         try:
             virtual_sdcard = await kapi.query_objects({"virtual_sdcard": None})
@@ -657,7 +676,7 @@ class SpoolManager:
                 "spoolman:check_failure", {"message" : msg}
             )
             return False
-        spools = await self.get_spools_for_machine(silent=True)
+        spools = self.slot_occupation
         found = False
         for spool in spools :
             if int(spool['id']) == active_spool :
@@ -677,8 +696,8 @@ class SpoolManager:
                 "spoolman:check_failure", {"message" : msg}
             )
             return False
-        spools = ret
-        if not spools:
+        self.slot_occupation = ret
+        if not self.slot_occupation:
             if state not in ['paused', 'cancelled', 'complete', 'standby']:
                 await kapi.pause_print()
             msg = f"No spools assigned to machine {self.printer_info['hostname']}"
@@ -687,7 +706,7 @@ class SpoolManager:
             )
             return False
 
-        ret = await self.verify_consistency(metadata, spools)
+        ret = await self.verify_consistency(metadata, self.slot_occupation)
         if ret :
             msg = f"Slicer setup and spoolman db are consistent"
             await self._log_n_send(msg)
