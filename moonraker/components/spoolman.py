@@ -51,6 +51,9 @@ class SpoolManager:
         self.last_sync_time = datetime.datetime.now()
         self.extruded_lock = asyncio.Lock()
         self.spoolman_url = f"{config.get('server').rstrip('/')}/api"
+        self.slot_occupation = {}
+        self.toolhead = {}
+        self.current_extruder = None
 
         self.klippy_apis: APIComp = self.server.lookup_component("klippy_apis")
         self.http_client: HttpClient = self.server.lookup_component(
@@ -116,10 +119,10 @@ class SpoolManager:
         )
 
     async def _handle_server_ready(self):
-        result = await self.klippy_apis.subscribe_objects(
+        status = await self.klippy_apis.subscribe_objects(
             {"toolhead": ["position"]}, self._handle_status_update, {}
         )
-        initial_e_pos = self._eposition_from_status(result)
+        initial_e_pos = self._eposition_from_status(status)
         logging.debug(f"Initial epos: {initial_e_pos}")
         if initial_e_pos is not None:
             self.highest_e_pos = initial_e_pos
@@ -127,30 +130,28 @@ class SpoolManager:
             logging.error("Spoolman integration unable to subscribe to epos")
             raise self.server.error("Unable to subscribe to e position")
 
+        self.toolhead = await self.klippy_apis.query_objects({"toolhead": None})
+
     def _eposition_from_status(self, status: Dict[str, Any]) -> Optional[float]:
         position = status.get("toolhead", {}).get("position", [])
-        extruder = status.get("toolhead", {}).get("extruder", None)
-        if extruder is None: # create a failre
-            self.server.send_event(
-                "spoolman:check_failure", {"message" : "extruder not found in toolhead status"}
-            )
-
-        for spool in self.slot_occupation:
-            ext = 0 if extruder == "extruder" else (int(extruder.split('extruder')[1]) - 1)
-            if int(spool['location'].split(':')[1]) == ext :
-                self.server.send_event(
-                    "spoolman:active_spool_set", {"spool_id": spool['id']}
-                )
-                logging.info(f"Setting active spool to: {spool['id']}")
-                self.spool_id = spool['id']
-                self.set_active_spool(spool['id'])
-                break
-            else :
-                logging.info(f"Couldnt find a spool for extruder {extruder} in slot {ext}")
-
         return position[3] if len(position) > 3 else None
 
     async def _handle_status_update(self, status: Dict[str, Any], _: float) -> None:
+        extr = self.toolhead.get("toolhead", {}).get("extruder", None)
+        ext = 0 if extr == "extruder" else (int(extr.split('extruder')[1]) - 1)
+        if extr and extr != self.current_extruder:
+            self.current_extruder = extr
+            for spool in self.slot_occupation:
+                if int(spool['location'].split(':')[1]) == ext :
+                    self.server.send_event(
+                        "spoolman:active_spool_set", {"spool_id": spool['id']}
+                    )
+                    logging.info(f"Setting active spool to: {spool['id']}")
+                    self.spool_id = spool['id']
+                    self.set_active_spool(spool['id'])
+                    break
+                else :
+                    logging.info(f"Couldnt find a spool for extruder {extr} in slot {ext}")
         epos = self._eposition_from_status(status)
         if epos and epos > self.highest_e_pos:
             async with self.extruded_lock:
@@ -625,11 +626,10 @@ class SpoolManager:
                 "spoolman:check_failure", {"message" : "Klippy not ready"}
             )
             return False
-        kapi: APIComp = self.server.lookup_component("klippy_apis")
-        kapi.pause_print()
+        self.klippy_apis.pause_print()
         try:
-            virtual_sdcard = await kapi.query_objects({"virtual_sdcard": None})
-            print_stats = await kapi.query_objects({"print_stats": None})
+            virtual_sdcard = await self.klippy_apis.query_objects({"virtual_sdcard": None})
+            print_stats = await self.klippy_apis.query_objects({"print_stats": None})
         except Exception:
             # Klippy not connected
             logging.error(f"Klippy not retrieve virtual_sdcard or print_stats")
@@ -676,16 +676,6 @@ class SpoolManager:
                 "spoolman:check_failure", {"message" : msg}
             )
             return False
-        spools = self.slot_occupation
-        found = False
-        for spool in spools :
-            if int(spool['id']) == active_spool :
-                found = True
-        if not found :
-            await self._log_n_send(f"Active spool {active_spool} is not assigned to this machine")
-            await self._log_n_send(f"Run : ")
-            await self._log_n_send(f"{CONSOLE_TAB}SET_SPOOL_SLOT ID={active_spool} SLOT=integer")
-
         # Get spools assigned to current machine
         ret = await self.get_spools_for_machine()
         if ret == False:
@@ -697,6 +687,16 @@ class SpoolManager:
             )
             return False
         self.slot_occupation = ret
+        spools = self.slot_occupation
+        found = False
+        for spool in spools :
+            if int(spool['id']) == active_spool :
+                found = True
+        if not found :
+            await self._log_n_send(f"Active spool {active_spool} is not assigned to this machine")
+            await self._log_n_send(f"Run : ")
+            await self._log_n_send(f"{CONSOLE_TAB}SET_SPOOL_SLOT ID={active_spool} SLOT=integer")
+
         if not self.slot_occupation:
             if state not in ['paused', 'cancelled', 'complete', 'standby']:
                 await kapi.pause_print()
