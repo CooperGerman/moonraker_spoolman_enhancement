@@ -681,7 +681,7 @@ class SpoolManager:
             )
             return False
 
-        if ret == False:
+        if self.slot_occupation == False:
             if state not in ['paused', 'cancelled', 'complete', 'standby']:
                 await self.klippy_apis.pause_print()
             msg = f"Failed to retrieve spools from spoolman"
