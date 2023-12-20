@@ -123,6 +123,7 @@ class SpoolManager:
         )
 
     async def _handle_server_ready(self):
+        self.slot_occupation = await self.get_spools_for_machine()
         status = await self.klippy_apis.subscribe_objects(
             {"toolhead": ["position"]}, self._handle_status_update, {}
         )
@@ -178,6 +179,7 @@ class SpoolManager:
             return
 
         for spool in self.slot_occupation :
+            logging.info(f"found spool: {spool['filament']['name']} at slot {spool['location'].split(':')[1]}")
             if int(spool['location'].split(':')[1]) == slot :
                 await self.set_active_spool(spool['id'])
                 return
@@ -678,17 +680,15 @@ class SpoolManager:
                 "spoolman:check_failure", {"message" : msg}
             )
             return False
-        # Get spools assigned to current machine
-        ret = await self.get_spools_for_machine()
+
         if ret == False:
             if state not in ['paused', 'cancelled', 'complete', 'standby']:
-                await kapi.pause_print()
+                await self.klippy_apis.pause_print()
             msg = f"Failed to retrieve spools from spoolman"
             self.server.send_event(
                 "spoolman:check_failure", {"message" : msg}
             )
             return False
-        self.slot_occupation = ret
         spools = self.slot_occupation
         found = False
         for spool in spools :
@@ -701,7 +701,7 @@ class SpoolManager:
 
         if not self.slot_occupation:
             if state not in ['paused', 'cancelled', 'complete', 'standby']:
-                await kapi.pause_print()
+                await self.klippy_apis.pause_print()
             msg = f"No spools assigned to machine {self.printer_info['hostname']}"
             self.server.send_event(
                 "spoolman:check_failure", {"message" : msg}
@@ -712,7 +712,7 @@ class SpoolManager:
         if ret :
             msg = f"Slicer setup and spoolman db are consistent"
             await self._log_n_send(msg)
-            kapi.resume_print()
+            self.klippy_apis.resume_print()
             return True
         else :
             msg1 = f"FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED! PAUSING PRINT."
@@ -721,7 +721,7 @@ class SpoolManager:
             await self._log_n_send(msg2)
             #if printer is runnning, pause it
             if state not in ['paused', 'cancelled', 'complete', 'standby']:
-                await kapi.pause_print()
+                await self.klippy_apis.pause_print()
             self.server.send_event(
                 "spoolman:check_failure", {"message" : msg1+msg2}
             )
