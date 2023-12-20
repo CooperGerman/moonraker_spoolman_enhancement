@@ -70,6 +70,9 @@ class SpoolManager:
             "spoolman_set_active_spool", self.set_active_spool
         )
         self.server.register_remote_method(
+            "spoolman_set_active_slot", self.set_active_slot
+        )
+        self.server.register_remote_method(
             "spoolman_get_spool_info", self.get_spool_info
         )
         self.server.register_remote_method(
@@ -87,6 +90,7 @@ class SpoolManager:
 
     def _register_notifications(self):
         self.server.register_notification("spoolman:active_spool_set")
+        self.server.register_notification("spoolman:active_slot_set")
         self.server.register_notification("spoolman:get_spool_info")
         self.server.register_notification("spoolman:check_filament")
         self.server.register_notification("spoolman:check_failure")
@@ -130,28 +134,11 @@ class SpoolManager:
             logging.error("Spoolman integration unable to subscribe to epos")
             raise self.server.error("Unable to subscribe to e position")
 
-        self.toolhead = await self.klippy_apis.query_objects({"toolhead": None})
-
     def _eposition_from_status(self, status: Dict[str, Any]) -> Optional[float]:
         position = status.get("toolhead", {}).get("position", [])
         return position[3] if len(position) > 3 else None
 
     async def _handle_status_update(self, status: Dict[str, Any], _: float) -> None:
-        extr = self.toolhead.get("toolhead", {}).get("extruder", None)
-        ext = 0 if extr == "extruder" else (int(extr.split('extruder')[1]) - 1)
-        if extr and extr != self.current_extruder:
-            self.current_extruder = extr
-            for spool in self.slot_occupation:
-                if int(spool['location'].split(':')[1]) == ext :
-                    self.server.send_event(
-                        "spoolman:active_spool_set", {"spool_id": spool['id']}
-                    )
-                    logging.info(f"Setting active spool to: {spool['id']}")
-                    self.spool_id = spool['id']
-                    self.set_active_spool(spool['id'])
-                    break
-                else :
-                    logging.info(f"Couldnt find a spool for extruder {extr} in slot {ext}")
         epos = self._eposition_from_status(status)
         if epos and epos > self.highest_e_pos:
             async with self.extruded_lock:
@@ -181,6 +168,21 @@ class SpoolManager:
             "spoolman:active_spool_set", {"spool_id": spool_id}
         )
         logging.info(f"Setting active spool to: {spool_id}")
+
+    async def set_active_slot(self, slot: int = None) -> None:
+        '''
+        Search for spool id matching the slot number and set it as active
+        '''
+        if slot is None:
+            logging.error(f"Slot number not provided")
+            return
+
+        for spool in self.slot_occupation :
+            if int(spool['location'].split(':')[1]) == slot :
+                await self.set_active_spool(spool['id'])
+                return
+
+        logging.error(f"Could not find a matching spool for slot {slot}")
 
     async def track_filament_usage(self):
         spool_id = self.spool_id
