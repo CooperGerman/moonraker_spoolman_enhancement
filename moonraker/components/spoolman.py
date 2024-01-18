@@ -517,24 +517,24 @@ class SpoolManager:
                 if spool_info['location'].split(':')[0] == self.printer_info["hostname"] :
                     await self._log_n_send(f"Spool {spool_id} is already assigned to this machine @ slot {spool_info['location'].split(':')[1]}")
                     if int(spool_info['location'].split(':')[1]) == slot :
-                        await self._log_n_send(f"Updating slot for spool {spool_id} to {slot}")
+                        await self._log_n_send(f"Updating slot for spool {spool_info['filament']['name']} (id: {spool_id}) to {slot}")
                 else :
                     await self._log_n_send(f"Spool {spool_id} is already assigned to another machine: {spool_info['location']}")
                     return False
 
         # then check that no spool is already assigned to the slot of this machine
+        self.slot_occupation = await self.get_spools_for_machine(silent=True)
         spools = self.slot_occupation
         if spools not in [False, None]:
             for spool in spools :
                 logging.info(f"found spool: {spool['filament']['name']} ")
                 if int(spool['location'].split(':')[1]) == slot :
-                    await self._log_n_send(f"Slot {slot} is already assigned to spool {spool['id']}")
+                    await self._log_n_send(f"Slot {slot} is already assigned to spool {spool['filament']['name']} (id: {spool['id']})")
                     await self._log_n_send(f"{CONSOLE_TAB}- Overwriting slot assignment")
                     if not await self.unset_spool_slot(spool['id']) :
-                        await self._log_n_send(f"{CONSOLE_TAB*2}Failed to unset spool {spool['id']} from slot {slot}")
+                        await self._log_n_send(f"{CONSOLE_TAB*2}Failed to unset spool {spool['filament']['name']} (id: {spool['id']}) from slot {slot}")
                         return False
-                    else :
-                        await self._log_n_send(f"{CONSOLE_TAB*2}Spool {spool['id']} unset from slot {slot}")
+                    await self._log_n_send(f"{CONSOLE_TAB*2}Spool {spool['filament']['name']} (id: {spool['id']}) unset from slot {slot}")
 
         # Check if spool is not allready archived
         if spool_info['archived'] :
@@ -545,7 +545,7 @@ class SpoolManager:
         #use the PATCH method on the spoolman api
         #get current printer hostname
         machine_hostname = self.printer_info["hostname"]
-        logging.info(f"Setting spool {spool_id} for machine: {machine_hostname} @ slot {slot}")
+        logging.info(f"Setting spool {spool_info['filament']['name']} (id: {spool_info['id']}) for machine: {machine_hostname} @ slot {slot}")
         # get spool info from spoolman
         spool_info = await self.get_info_for_spool(spool_id)
         body = {
