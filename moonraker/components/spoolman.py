@@ -109,7 +109,7 @@ class SpoolManager:
             self._proxy_spoolman_request,
         )
         self.server.register_endpoint(
-            "/filament/info",
+            "/access/spoolman/info",
             ["GET"],
             self.__spool_info_notificator,
         )
@@ -200,6 +200,22 @@ class SpoolManager:
             "spoolman:active_spool_set", {"spool_id": spool_id}
         )
         logging.info(f"Setting active spool to: {spool_id}")
+
+    async def set_active_slot(self, slot: int = None) -> None:
+        '''
+        Search for spool id matching the slot number and set it as active
+        '''
+        if slot is None:
+            logging.error(f"Slot number not provided")
+            return
+
+        for spool in self.slot_occupation :
+            logging.info(f"found spool: {spool['filament']['name']} at slot {spool['location'].split(':')[1]}")
+            if int(spool['location'].split(':')[1]) == slot :
+                await self.set_active_spool(spool['id'])
+                return
+
+        logging.error(f"Could not find a matching spool for slot {slot}")
 
     async def track_filament_usage(self):
         spool_id = self.spool_id
