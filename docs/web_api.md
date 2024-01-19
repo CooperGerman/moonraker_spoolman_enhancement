@@ -1,8 +1,8 @@
 #
 
 Most API methods are supported over the Websocket, HTTP, and MQTT
-(if configured) transports. File Transfer and `/access` requests are only
-available over HTTP. The Websocket is required to receive server generated
+(if configured) transports. File Transfer requests (upload and download)
+exclusive to HTTP. The Websocket is required to receive server generated
 events such as gcode responses.  For information on how to set up the
 Websocket, please see the Appendix at the end of this document.
 
@@ -74,7 +74,7 @@ of a request.
 ### JSON-RPC API Overview
 
 The Websocket and MQTT transports use the [JSON-RPC 2.0](https://jsonrpc.org)
-protocol.  The Websocket transmits objects in a text frame,  whereas MQTT
+protocol. The Websocket transmits JSON-RPC objects in a text frame,  whereas MQTT
 transmits them in the payload of a topic.  When MQTT is configured Moonraker
 subscribes to an api request topic. After an api request is processed Moonraker
 publishes the return value to a response topic. By default these topics are
@@ -82,6 +82,9 @@ publishes the return value to a response topic. By default these topics are
 `{instance_name}/moonraker/api/response`.  The `{instance_name}` should be a
 unique identifier for each instance of Moonraker and defaults to the machine's
 host name.
+
+In addition, most JSON-RPC methods are available via the
+[JSONRPC HTTP request](#json-rpc-over-http).
 
 An encoded request should look something like:
 ```json
@@ -192,12 +195,11 @@ be closed if Moonraker is restarted or shutdown.
 
 ### Unix Socket Connection
 
-All JSON-RPC APIs available over the websocket are also made available over a
-Unix Domain Socket.  Moonraker creates the socket file at
+All JSON-RPC APIs available over the Websocket transport are also available
+over the Unix Domain Socket connection.  Moonraker creates the socket file at
 `<datapath>/comms/moonraker.sock` (ie: `~/printer_data/comms/moonraker.sock`).
-The Unix Socket does not use the websocket transport protocol, instead
-it expects UTF-8 encoded JSON-RPC strings. Each JSON-RPC request must be
-terminated with an ETX character (`0x03`).
+The Unix Socket expects UTF-8 encoded JSON-RPC byte strings. Each JSON-RPC
+request must be terminated with an ETX character (`0x03`).
 
 The Unix Socket is desirable for front ends and extensions running on the
 local machine as authentication is not necessary.  There should be a small
@@ -484,6 +486,7 @@ included.
     }
 }
 ```
+
 #### Request Cached Temperature Data
 HTTP request:
 ```http
@@ -762,6 +765,53 @@ The connected websocket's unique identifier.
     "websocket_id": 1730367696
 }
 ```
+
+#### JSON-RPC over HTTP
+
+Exposes the JSON-RPC interface over HTTP.  All JSON-RPC methods with
+corresponding HTTP APIs are available.  Methods exclusive to other
+transports, such as [Identify Connection](#identify-connection), are
+not available.
+
+HTTP request:
+```http
+POST /server/jsonrpc
+Content-Type: application/json
+{
+    "jsonrpc": "2.0",
+    "method": "printer.info",
+    "id": 5153
+}
+```
+!!! Note
+    If authentication is required it must be part of the HTTP request,
+    either using the API Key Header (`X-Api-Key`) or JWT Bearer Token.
+
+Returns:
+
+The full JSON-RPC response.
+
+```json
+{
+    "jsonrpc": "2.0",
+    "id": 5153,
+    "result": {
+        "state": "ready",
+        "state_message": "Printer is ready",
+        "hostname": "my-pi-hostname",
+        "software_version": "v0.9.1-302-g900c7396",
+        "cpu_info": "4 core ARMv7 Processor rev 4 (v7l)",
+        "klipper_path": "/home/pi/klipper",
+        "python_path": "/home/pi/klippy-env/bin/python",
+        "log_file": "/tmp/klippy.log",
+        "config_file": "/home/pi/printer.cfg",
+    }
+}
+```
+
+!!! Note
+    This request will never return an HTTP error. When an error is
+    encountered a JSON-RPC error response will be returned.
 
 ### Printer Administration
 
@@ -4591,7 +4641,7 @@ Returns:
 
 `ok` when complete
 
-### Rollback to the previous version
+#### Rollback to the previous version
 
 HTTP request:
 
@@ -6070,6 +6120,97 @@ Returns:
 `ok` if an `id` was present in the request, otherwise no response is
 returned.  Once received, Moonraker will broadcast this event via
 the [agent event notification](#agent-events) to all other connections.
+
+#### Register a method with Klipper
+
+Allows agents to register remote methods with Klipper.  These methods
+may be called in `gcode_macros`.
+
+!!! Note
+    This API is only available to websocket connections that have
+    identified themselves as an `agent` type.
+
+HTTP Request: Not Available
+
+JSON-RPC request:
+```json
+{
+    "jsonrpc": "2.0",
+    "method":"connection.register_remote_method",
+    "params": {
+        "method_name": "firemon_alert_heated"
+    }
+}
+```
+
+Parameters:
+
+- `method_name`: The name of the desired method.  Agents should make sure that
+  the name is unique.  One recommendation is to prefix the agent's name
+  to each method it registers.
+
+Returns:
+
+`ok` if registration is successful.  An error is returned if the method name
+is already registered.
+
+!!! Note
+    Methods registered by agents will persist until the agent disconnects.
+    Upon connection, it is only necessary that they register their desired
+    methods once.
+
+Example:
+
+Presume an application named `firemon` has connected to Moonraker's websocket
+and identified itself as an `agent`. After identification it registers a
+remote method named `firemon_alert_heated`.
+
+In addition, the user the following `gcode_macro` configured in `printer.cfg`:
+
+```ini
+# printer.cfg
+
+[gcode_macro ALERT_HEATED]
+gcode:
+  {% if not params %}
+    {action_call_remote_method("firemon_alert_heated")}
+  {% else %}
+    {% set htr = params.HEATER|default("unknown") %}
+    {% set tmp = params.TEMP|default(0)|float %}
+    {action_call_remote_method(
+        "firemon_alert_heated", heater=htr, temp=tmp)}
+  {% endif %}
+
+
+```
+
+When the `ALERT_HEATED HEATER=extruder TEMP=200` gcode is executed by Klipper,
+the agent will receive the following:
+
+```json
+{
+    "jsonrpc": "2.0",
+    "method":"firemon_alert_heated",
+    "params": {
+        "heater": "extruder",
+        "temp": 200
+    }
+}
+```
+
+When the `ALERT_HEATED` gcode is executed with no parameters, the agent will
+receive the following:
+
+```json
+{
+    "jsonrpc": "2.0",
+    "method":"monitor_alert_heated"
+}
+```
+
+!!! Note
+    Methods called from Klipper never contain the "id" field, as Klipper
+    does not accept return values to remote methods.
 
 ### Debug APIs
 

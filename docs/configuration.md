@@ -2,7 +2,7 @@
 This document describes Moonraker's full configuration. By default Moonraker
 loads the configuration file from `~/moonraker.conf`, however prebuilt
 images such as MainsailOS and FluiddPi configure Moonraker to load the
-configuration from `~/klipper_config/moonraker.conf`.
+configuration from `~/printer_data/config/moonraker.conf`.
 
 As this document references configuration for both Klipper (`printer.cfg`)
 and Moonraker (`moonraker.conf`), each example contains a comment indicating
@@ -124,6 +124,13 @@ management functionality.  If omitted defaults will be used.
 queue_gcode_uploads: False
 #   When set to True the file manager will add uploads to the job_queue when
 #   the `start_print` flag has been set.  The default if False.
+check_klipper_config_path: True
+#   By default Moonraker will validate that Klipper's configuration file exists
+#   within the data path's "config" folder, as this is a requirement for
+#   Moonraker to write to the configuration.  If this validation check fails
+#   Moonaker will warn the user. Installations that do not wish to use Moonraker
+#   to manage Klipper's configuration may set this option to False to bypass the
+#   location check.  The default is True.
 enable_object_processing: False
 #   When set to True gcode files will be run through a "preprocessor"
 #   during metadata extraction if object tags are detected.  This preprocessor
@@ -348,14 +355,18 @@ location: printer
 #   A description of the webcam location, ie: what the webcam is observing.
 #   The default is "printer".
 icon:
-#   A name of the icon to use for the camera.  The default is mdiWebcam.
+#   A name of the icon to use for the camera.  See the tip following this
+#   example for known values.  The default is mdiWebcam.
 enabled: True
 #   An optional boolean value to indicate if this webcam should be enabled.
 #   Default is True.
 service: mjpegstreamer
 #   The name of the application or service hosting the webcam stream.  Front-
-#   ends may use this configuration to determine how to launch or start the
-#   program.  The default is "mjpegstreamer".
+#   ends may use this configuration to determine how to connect to the service
+#   and interpret its stream.  See the tip following this example for
+#   currently known values.  The default is "mjpegstreamer".
+location: printer
+#   A string describing the location of the camera.  Default is printer.
 target_fps: 15
 #   An integer value specifying the target framerate.  The default is 15 fps.
 target_fps_idle: 5
@@ -383,6 +394,41 @@ aspect_ratio: 4:3
 #   is specific to certain services, otherwise it is ignored.
 #   The default is 4:3.
 ```
+
+!!! Tip
+    The following are known `icon` values:
+
+    | Icon Description | [webcam] icon value | Supported Frontends |
+    | ---------------- | --------------------| -------- |
+    | Printer | `mdiPrinter3d` | Mainsail |
+    | Nozzle | `mdiPrinter3dNozzle` | Mainsail |
+    | Bed | `mdiRadiatorDisabled` | Mainsail |
+    | Webcam | `mdiWebcam` | Mainsail |
+    | Filament | `mdiAlbum` | Mainsail |
+    | Door | `mdiDoor` | Mainsail |
+    | MCU | `mdiRaspberryPi` | Mainsail |
+    | Hot | `mdiCampfire` | Mainsail |
+
+    The documentation for
+    [Mainsail](https://docs.mainsail.xyz/overview/settings/webcams#service)
+    and [Fluidd](https://docs.fluidd.xyz/features/cameras)
+    contain descriptions for their respective streaming service options.
+    Below is a table of values mapping currently known service types to
+    the values accepted by the webcam's `service` option:
+
+    | Service Type | [webcam] service value | Supported Frontends |
+    | ------------- | --------------------- | ------------------- |
+    | MJPEG-Streamer | `mjpegstreamer` | Mainsail, Fluidd |
+    | Adaptive MJPEG-Streamer | `mjpegstreamer-adaptive` | Mainsail, Fluidd |
+    | UV4L-MJPEG | `uv4l-mjpeg` |  Mainsail |
+    | IP-Camera | `ipstream` | Mainsail, Fluidd |
+    | WebRTC (camera-streamer) | `webrtc-camerastreamer` | Mainsail, Fluidd |
+    | WebRTC (go2rtc) | `webrtc-go2rtc` | Mainsail, Fluidd |
+    | WebRTC (MediaMTX) | `webrtc-mediamtx` | Mainsail |
+    | WebRTC (Janus) | `webrtc-janus` | Mainsail |
+    | HLS Streamer | `hlsstream` | Mainsail, Fluidd |
+    | jMuxer | `jmuxer-stream` | Mainsail |
+    | HTTP Page | `iframe`| Fluidd |
 
 ## Optional Components
 
@@ -616,6 +662,9 @@ type:
 #   tplink_smartplug, tasmota, shelly, homeseer, homeassistant, loxonev1,
 #   smartthings, mqtt or hue.
 #   This parameter must be provided.
+initial_state: off
+#    The state the power device should be initialized to.  May be on or
+#    off.  When this option is not specifed no initial state will be set.
 off_when_shutdown: False
 #   If set to True the device will be powered off when Klipper enters
 #   the "shutdown" state.  This option applies to all device types.
@@ -654,6 +703,10 @@ bound_services:
 #   the Moonraker service can not be bound to a power device.  Note that
 #   service names are case sensitive.
 #
+#   When the "initial_state" option is explcitly configured bound services
+#   will be synced with the current state.  For example, if the initial_state
+#   is "off", all bound services will be stopped after device initialization.
+#
 #   The default is no services are bound to the device.
 ```
 
@@ -679,10 +732,6 @@ pin: gpiochip0/gpio26
 #      !gpiochip0/gpio26
 #      !gpio26
 #    This parameter must be provided for "gpio" type devices
-initial_state: off
-#    The initial state for GPIO type devices.  May be on or
-#    off.  When moonraker starts the device will be set to this
-#    state.  Default is off.
 timer:
 #    A time (in seconds) after which the device will power off after being.
 #    switched on. This effectively turns the device into a  momentary switch.
@@ -833,10 +882,6 @@ pin: gpiochip0/gpio26
 #      !gpiochip0/gpio26
 #      !gpio26
 #    This parameter must be provided for "gpio" type devices
-initial_state: off
-#    The initial state for GPIO type devices.  May be on or
-#    off.  When moonraker starts the device will be set to this
-#    state.  Default is off.
 timer:
 #    A time (in seconds) after which the device will power off after being.
 #    switched on. This effectively turns the device into a  momentary switch.
@@ -929,6 +974,9 @@ password: mypassword
 #### Shelly Configuration
 
 The following options are available for `shelly` device types:
+
+!!! Note
+    Currently only Gen 1 Shelly devices support Authentication
 
 ```ini
 # moonraker.conf
@@ -1198,6 +1246,58 @@ token: smartthings-bearer-token
 device: smartthings-device-id
 ```
 
+####  Domoticz (HTTP)
+
+Here an example for a Domoticz Light/Switch device with idx 1234.
+https://www.domoticz.com/wiki/Domoticz_API/JSON_URL%27s#Turn_a_light.2Fswitch_on.2Foff
+
+Authentication with basic header stored in Moonraker.secrets (see the [secrets]
+documentation for details).
+You have to convert your "username:password" to base64 and put in Moonraker.secrets file.
+
+!!! Note
+    If http unsecure is required, configure Domoticz to allow basic auth on http.
+    https://www.domoticz.com/wiki/Security#API_Protection
+
+```ini
+# moonraker.conf
+
+[power printer_domoticz]
+type: http
+on_url: https://domoticz-ip<:port>/json.htm?type=command&param=switchlight&switchcmd=On&idx=1234
+off_url: https://domoticz-ip<:port>/json.htm?type=command&param=switchlight&switchcmd=Off&idx=1234
+status_url: https://domoticz-ip<:port>/json.htm?type=command&param=getdevices&rid=1234
+request_template:
+  {% do http_request.add_header("Authorization", "Basic %s" % secrets.domoticz_credentials.base64userpass) %}
+  {% do http_request.send() %}
+response_template:
+  # Domoticz does not return device state in the response to on and off
+  # commands making it necessary to request device status.
+  {% if command in ["on", "off"] %}
+    # Some delay is necessary to ensure that Domoticz has finished processing
+    # the command.  This example sleeps for 1 second, more or less may be required
+    # depending on the type of switch, speed of the Domoticz host, etc.
+    {% do async_sleep(1.0) %}
+    # Set the request method, clear the body, set the url
+    {% do http_request.set_method("GET") %}
+    {% do http_request.set_body(None) %}
+    {% do http_request.set_url(urls.status) %}
+    # Note: The Authorization header was set in the "request_template".  Since the
+    # http request object is shared between both templates it is not necessary to
+    # add it again unless we perform a "reset()" on the request.
+    {% set response = http_request.send() %}
+    # Raise an exception if we don't get a successful response.  This is handled
+    # for us after executing the response template, however sending a request here
+    # requires that
+    {% do response.raise_for_status() %}
+  {% endif %}
+  # We use the `last_response` method to fetch the result and decode the
+  # json response.
+  {% set resp = http_request.last_response().json() %}
+  # The expression below will render "on" or "off".
+  {resp.result[0].Status.lower()}
+```
+
 #### Hue Device Configuration
 
 The following options are available for `hue` device types:
@@ -1208,6 +1308,10 @@ The following options are available for `hue` device types:
 address:
 #   A valid ip address or hostname of the Philips Hue Bridge. This
 #   parameter must be provided.
+port:
+#   A port number if an alternative Zigbee bridge is used on a HTTP port 
+#   different from the default 80/443
+#   
 user:
 #   The api key used for request authorization.  This option accepts
 #   Jinja2 Templates, see the [secrets] section for details.
@@ -2230,10 +2334,13 @@ pin: gpiochip0/gpio26
 #      ^!gpiochip0/gpio26
 #      ~!gpiochip0/gpio26
 #   This parameter must be provided
-minimum_event_time: .05
-#   The minimum time (in seconds) between events to trigger a response.  This is
-#   is used to debounce buttons.  This value must be at least .01 seconds.
-#   The default is .05 seconds (50 milliseconds).
+debounce_period: .05
+#   The time (in seconds) an event is delayed to debounce the response.
+#   The minimum debounce period is .01 seconds.  The default is .05 seconds.
+minimum_event_time: 0
+#   The minimum event duration (in seconds) required to trigger a response.
+#   This can be used as a secondary debounce procedure. The default is 0
+#   seconds (no minumum duration).
 on_press:
 on_release:
 #   Jinja2 templates to be executed when a button event is detected.  At least one

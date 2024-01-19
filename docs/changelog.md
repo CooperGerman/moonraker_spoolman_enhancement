@@ -24,6 +24,11 @@ The format is based on [Keep a Changelog].
 - **server**: Added a `route_prefix` option
 - **webcam**: Webcam APIs can now specify cameras by `uid` or `name`
 - **deps**:  Added support for optional `msgspec` and `uvloop` packages
+- **extensions**: Agents may now register remote methods with Klipper
+- **file_manager**: Add `check_klipper_config_path` option
+- **button**: Added `debounce_period` option
+- **history**:  Added a check for previous jobs not finished (ie: when power is
+  lost during a print).  These jobs will report their status as `interrupted`.
 
 ### Fixed
 
@@ -60,6 +65,9 @@ The format is based on [Keep a Changelog].
 - **update_manager**: APIs that return status report additional fields.
   See the [API Documentation](./web_api.md#get-update-status) for details.
 - **proc_stats**: Improved performance of Raspberry Pi CPU throttle detection.
+- **power**:  Bound services are now processed during initialization when
+  `initial_state` is configured.
+- **gpio**:  Migrate from libgpiod to python-periphery
 
 ## [0.8.0] - 2023-02-23
 
