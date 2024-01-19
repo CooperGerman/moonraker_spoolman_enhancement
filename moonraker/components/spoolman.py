@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 DB_NAMESPACE = "moonraker"
 ACTIVE_SPOOL_KEY = "spoolman.spool_id"
-CONSOLE_TAB="   " # Special space characters used as they will be siplayed in gcode console
+CONSOLE_TAB="   " # Special space characters used as they will be displayed in gcode console
 
 class SpoolManager:
     spool_id: Optional[int] = None
@@ -380,9 +380,13 @@ class SpoolManager:
             else :
                 # if filament name from slicer is not the same as the one in spoolman db
                 if sb_tools[tool_id]['filament']['name'] != filament['name']:
+                    # if this spool is used for this print then there is a mismatch (else it's ok, but message is sent anyway)
                     await self._log_n_send(f"Filament mismatch spoolman vs slicer @id {tool_id}")
                     await self._log_n_send(f"{CONSOLE_TAB}- {sb_tools[tool_id]['filament']['name']} != {filament['name']}")
-                    mismatch = True
+                    if filament['usage'] > 0 :
+                        mismatch = True
+                    else :
+                        await self._log_n_send(f"{CONSOLE_TAB}  * This filament is not used during this print (not pausing the printer)")
 
         if mismatch:
             return False
@@ -430,11 +434,17 @@ class SpoolManager:
             return False
         if spools:
             if not silent : await self._log_n_send(f"Spools for machine:")
+            # create a table of size len(spools)
+            table = [None for x in range(len(spools))]
             for spool in spools:
                 slot = spool['location'].split(machine_hostname+':')[1]
                 if not slot :
                     if not silent : self._log_n_send(f"location field for {spool['filament']['name']} @ {spool['id']} in spoolman db is not formatted correctly. Please check the spoolman setup.")
-                if not silent : await self._log_n_send(f"{CONSOLE_TAB}- {spool['filament']['name']} (slot : {slot})")
+                else :
+                    table[int(slot)] = spool
+            if not silent :
+                for i, spool in enumerate(table) :
+                    await self._log_n_send(f"{CONSOLE_TAB}{i} : {spool['filament']['name']}")
         else :
             if not silent : await self._log_n_send(f"No spools assigned to machine: {machine_hostname}")
             return False
