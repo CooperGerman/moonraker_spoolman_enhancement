@@ -76,6 +76,7 @@ class SpoolManager:
         self._register_endpoints()
         # Uboe ########################### Start
         self.filament_slots = config.getint("filament_slots", default=1, minval=1)
+        self.slot_occupation = {}
         if self.filament_slots < 1 :
             self._log_n_send(f"Number of filament slots is not set or is less than 1. Please check the spoolman or moonraker [spoolman] setup.")
         self.printer_info = self.server.get_host_info()
@@ -120,6 +121,9 @@ class SpoolManager:
     def _register_notifications(self):
         self.server.register_notification("spoolman:active_spool_set")
         self.server.register_notification("spoolman:spoolman_status_changed")
+        self.server.register_notification("spoolman:check_failure")
+        self.server.register_notification("spoolman:spoolman_set_spool_slot")
+        self.server.register_notification("spoolman:get_spool_info")
 
     def _register_listeners(self):
         self.server.register_event_handler(
@@ -329,7 +333,7 @@ class SpoolManager:
         for spool in self.slot_occupation :
             logging.info(f"found spool: {spool['filament']['name']} at slot {spool['location'].split(':')[1]}")
             if int(spool['location'].split(':')[1]) == slot :
-                await self.set_active_spool(spool['id'])
+                self.set_active_spool(spool['id'])
                 return
 
         logging.error(f"Could not find a matching spool for slot {slot}")
@@ -652,7 +656,7 @@ class SpoolManager:
         else :
             if not silent : await self._log_n_send(f"No spools assigned to machine: {machine_hostname}")
             return False
-        return spools
+        self.slot_occupation = spools
 
     async def unset_spool_slot(self, spool_id : int) -> bool:
         '''
@@ -737,7 +741,7 @@ class SpoolManager:
                     return False
 
         # then check that no spool is already assigned to the slot of this machine
-        self.slot_occupation = await self.get_spools_for_machine(silent=True)
+        self.get_spools_for_machine(silent=True)
         spools = self.slot_occupation
         if spools not in [False, None]:
             for spool in spools :
@@ -837,13 +841,6 @@ class SpoolManager:
         await self._log_n_send("="*32)
         await self._log_n_send(f"Checking filament consistency: ")
         await self._log_n_send("="*32)
-        # verify that klipper is ready
-        if self.server.get_klippy_state() != "ready":
-            logging.error(f"Klippy not ready")
-            self.server.send_event(
-                "spoolman:check_failure", {"message" : "Klippy not ready"}
-            )
-            return False
         self.klippy_apis.pause_print()
         try:
             virtual_sdcard = await self.klippy_apis.query_objects({"virtual_sdcard": None})
