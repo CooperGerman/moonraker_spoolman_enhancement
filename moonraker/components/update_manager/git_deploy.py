@@ -36,6 +36,7 @@ class GitDeploy(AppDeploy):
         self._configure_path(config)
         self._configure_virtualenv(config)
         self._configure_dependencies(config)
+        self._configure_managed_services(config)
         self.origin: str = config.get('origin')
         self.moved_origin: Optional[str] = config.get('moved_origin', None)
         self.primary_branch = config.get("primary_branch", "master")
@@ -170,57 +171,6 @@ class GitDeploy(AppDeploy):
             raise self.log_exc(str(e))
         else:
             self.repo.set_rollback_state(rb_state)
-
-    async def _collect_dependency_info(self) -> Dict[str, Any]:
-        pkg_deps = await self._read_system_dependencies()
-        pyreqs = await self._read_python_reqs()
-        npm_hash = await self._get_file_hash(self.npm_pkg_json)
-        logging.debug(
-            f"\nApplication {self.name}: Pre-update dependencies:\n"
-            f"Packages: {pkg_deps}\n"
-            f"Python Requirements: {pyreqs}"
-        )
-        return {
-            "system_packages": pkg_deps,
-            "python_modules": pyreqs,
-            "npm_hash": npm_hash
-        }
-
-    async def _update_dependencies(
-        self, dep_info: Dict[str, Any], force: bool = False
-    ) -> None:
-        packages = await self._read_system_dependencies()
-        modules = await self._read_python_reqs()
-        logging.debug(
-            f"\nApplication {self.name}: Post-update dependencies:\n"
-            f"Packages: {packages}\n"
-            f"Python Requirements: {modules}"
-        )
-        if not force:
-            packages = list(set(packages) - set(dep_info["system_packages"]))
-            modules = list(set(modules) - set(dep_info["python_modules"]))
-        logging.debug(
-            f"\nApplication {self.name}: Dependencies to install:\n"
-            f"Packages: {packages}\n"
-            f"Python Requirements: {modules}\n"
-            f"Force All: {force}"
-        )
-        if packages:
-            await self._install_packages(packages)
-        if modules:
-            await self._update_python_requirements(self.python_reqs or modules)
-        npm_hash: Optional[str] = dep_info["npm_hash"]
-        ret = await self._check_need_update(npm_hash, self.npm_pkg_json)
-        if force or ret:
-            if self.npm_pkg_json is not None:
-                self.notify_status("Updating Node Packages...")
-                try:
-                    await self.cmd_helper.run_cmd(
-                        "npm ci --only=prod", notify=True, timeout=600.,
-                        cwd=str(self.path)
-                    )
-                except Exception:
-                    self.notify_status("Node Package Update failed")
 
     async def close(self) -> None:
         await self.repo.unset_current_instance()
