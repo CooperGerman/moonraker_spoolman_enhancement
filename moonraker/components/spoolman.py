@@ -909,6 +909,7 @@ class SpoolManager:
             await self._log_n_send(f"Active spool {active_spool} is not assigned to this machine")
             await self._log_n_send(f"Run : ")
             await self._log_n_send(f"{CONSOLE_TAB}SET_SPOOL_SLOT ID={active_spool} SLOT=integer")
+            return False
 
         if not self.slot_occupation:
             if state not in ['paused', 'cancelled', 'complete', 'standby']:
