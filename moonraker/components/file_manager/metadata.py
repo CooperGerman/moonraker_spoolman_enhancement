@@ -368,15 +368,15 @@ class PrusaSlicer(BaseSlicer):
         )
 
     def parse_initial_tool(self) -> Optional[float]:
-        return _regex_find_string(
+        return regex_find_string(
             r"#\s!UBOE:\sspoolman\s:\s=\s*(\d+)", self.footer_data)
 
     def parse_filament_used(self) -> Optional[float]:
-        return _regex_find_string(
+        return regex_find_string(
             r";\sfilament\sused\s\[g\]\s=\s(.*)", self.footer_data)
 
     def parse_print_compatible_printers(self) -> Optional[str]:
-        return _regex_find_string(
+        return regex_find_string(
             r";\s_print_compatible_printers\s=\s(.*)", self.footer_data)
 
     def parse_filament_type(self) -> Optional[str]:
