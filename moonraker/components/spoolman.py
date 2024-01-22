@@ -24,9 +24,9 @@ from typing import (
     cast
 )
 
+from ..common import WebRequest
 if TYPE_CHECKING:
     from ..confighelper import ConfigHelper
-    from ..common import WebRequest
     from .http_client import HttpClient, HttpResponse
     from .database import MoonrakerDatabase
     from .announcements import Announcements
@@ -50,16 +50,18 @@ class SpoolManager:
         '''
         self.server = config.get_server()
 
-        self.filament_slots = config.getint("filament_slots", default=1, minval=1)
-        if self.filament_slots < 1 :
-            self._log_n_send(f"Number of filament slots is not set or is less than 1. Please check the spoolman or moonraker [spoolman] setup.")
-        self.printer_info = self.server.get_host_info()
-        self.next_active_spool_update_time = 0.0
         self.eventloop = self.server.get_event_loop()
         self._get_spoolman_urls(config)
         self.sync_rate_seconds = config.getint("sync_rate", default=5, minval=1)
+        self.report_timer = self.eventloop.register_timer(self.report_extrusion)
+        self.pending_reports: Dict[int, float] = {}
+        self.spoolman_ws: Optional[WebSocketClientConnection] = None
+        self.connection_task: Optional[asyncio.Task] = None
+        self.spool_check_task: Optional[asyncio.Task] = None
+        self.ws_connected: bool = False
+        self.reconnect_delay: float = 2.
+        self.is_closing: bool = False
         self.extruded_lock = asyncio.Lock()
-        self.spoolman_url = f"{config.get('server').rstrip('/')}/api"
         self.spool_id: Optional[int] = None
         self._error_logged: bool = False
         self._highest_epos: float = 0
@@ -72,9 +74,16 @@ class SpoolManager:
         self._register_notifications()
         self._register_listeners()
         self._register_endpoints()
+        # Uboe ########################### Start
+        self.filament_slots = config.getint("filament_slots", default=1, minval=1)
+        if self.filament_slots < 1 :
+            self._log_n_send(f"Number of filament slots is not set or is less than 1. Please check the spoolman or moonraker [spoolman] setup.")
+        self.printer_info = self.server.get_host_info()
+        # ################################ End
         self.server.register_remote_method(
             "spoolman_set_active_spool", self.set_active_spool
         )
+        # Uboe ########################### Start
         self.server.register_remote_method(
             "spoolman_set_active_slot", self.set_active_slot
         )
@@ -93,19 +102,7 @@ class SpoolManager:
         self.server.register_remote_method(
             "spoolman_clear_spool_slots", self.clear_spool_slots
         )
-
-    def _get_spoolman_urls(self, config: ConfigHelper) -> None:
-        orig_url = config.get('server')
-        url_match = re.match(r"(?i:(?P<scheme>https?)://)?(?P<host>.+)", orig_url)
-        if url_match is None:
-            raise config.error(
-                f"Section [spoolman], Option server: {orig_url}: Invalid URL format"
-            )
-        scheme = url_match["scheme"] or "http"
-        host = url_match["host"].rstrip("/")
-        ws_scheme = "wss" if scheme == "https" else "ws"
-        self.spoolman_url = f"{scheme}://{host}/api"
-        self.ws_url = f"{ws_scheme}://{host}/api/v1/spool"
+        # ################################ End
 
     def _get_spoolman_urls(self, config: ConfigHelper) -> None:
         orig_url = config.get('server')
@@ -272,7 +269,9 @@ class SpoolManager:
         result = await self.klippy_apis.subscribe_objects(
             {"toolhead": ["position", "extruder"]}, self._handle_status_update, {}
         )
-        initial_e_pos = self._eposition_from_status(result)
+        toolhead = result.get("toolhead", {})
+        self._current_extruder = toolhead.get("extruder", "extruder")
+        initial_e_pos = toolhead.get("position", [None]*4)[3]
         logging.debug(f"Initial epos: {initial_e_pos}")
         if initial_e_pos is not None:
             self._highest_epos = initial_e_pos
@@ -334,7 +333,6 @@ class SpoolManager:
                 return
 
         logging.error(f"Could not find a matching spool for slot {slot}")
-        logging.info(f"Setting active spool to: {spool_id}")
 
     async def report_extrusion(self, eventtime: float) -> float:
         if not self.ws_connected:
@@ -464,6 +462,7 @@ class SpoolManager:
             await asyncio.wait_for(self.connection_task, 2.)
         except asyncio.TimeoutError:
             pass
+
     async def _log_n_send(self, msg):
         ''' logs and sends msg to the klipper console'''
         logging.error(msg)
@@ -480,7 +479,7 @@ class SpoolManager:
         webrequest = WebRequest(
             endpoint = f"{self.spoolman_url}/spools/{spool_id}",
             args=args,
-            action="GET",
+            request_type=RequestType.GET,
         )
         spool_info = await self._proxy_spoolman_request(webrequest)
         return spool_info
@@ -627,7 +626,7 @@ class SpoolManager:
         webrequest = WebRequest(
             endpoint = f"{self.spoolman_url}/spools",
             args=args,
-            action="GET",
+            request_type=RequestType.GET,
         )
         try :
             spools = await self._proxy_spoolman_request(webrequest)
@@ -684,7 +683,7 @@ class SpoolManager:
         webrequest = WebRequest(
             endpoint = f"{self.spoolman_url}/spools/{spool_id}",
             args=args,
-            action="PATCH",
+            request_type=RequestType.PATCH,
         )
         try :
             await self._proxy_spoolman_request(webrequest)
@@ -774,7 +773,7 @@ class SpoolManager:
         webrequest = WebRequest(
             endpoint = f"{self.spoolman_url}/spools/{spool_id}",
             args=args,
-            action="PATCH",
+            request_type=RequestType.PATCH,
         )
         try :
             await self._proxy_spoolman_request(webrequest)
@@ -814,7 +813,7 @@ class SpoolManager:
                 webrequest = WebRequest(
                     endpoint = f"{self.spoolman_url}/spools/{spool['id']}",
                     args=args,
-                    action="PATCH",
+                    request_type=RequestType.PATCH,
                 )
                 try :
                     await self._proxy_spoolman_request(webrequest)
