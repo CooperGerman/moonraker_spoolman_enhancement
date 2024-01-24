@@ -146,6 +146,11 @@ class SpoolManager:
             RequestType.GET,
             self._handle_status_request,
         )
+        self.server.register_endpoint(
+            "/access/spoolman/info",
+            RequestType.GET,
+            self.__spool_info_notificator,
+        )
 
     async def component_init(self) -> None:
         self.spool_id = await self.database.get_item(
