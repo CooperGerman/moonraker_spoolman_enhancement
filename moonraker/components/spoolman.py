@@ -274,6 +274,7 @@ class SpoolManager:
         self._last_ping_received = self.eventloop.get_loop_time()
 
     async def _handle_klippy_ready(self) -> None:
+        await self.get_spools_for_machine(silent=False)
         result: Dict[str, Dict[str, Any]]
         result = await self.klippy_apis.subscribe_objects(
             {"toolhead": ["position", "extruder"]}, self._handle_status_update, {}
@@ -699,6 +700,7 @@ class SpoolManager:
             logging.error(f"Failed to unset spool {spool_id} for machine {machine_hostname}: {e}")
             await self._log_n_send(f"Failed to unset spool {spool_id} for machine {machine_hostname}")
             return False
+        self.get_spools_for_machine(silent=True)
         return True
 
     async def set_spool_slot(self, spool_id : int, slot : int=None) -> bool:
@@ -745,10 +747,8 @@ class SpoolManager:
                     return False
 
         # then check that no spool is already assigned to the slot of this machine
-        self.get_spools_for_machine(silent=True)
-        spools = self.slot_occupation
-        if spools not in [False, None]:
-            for spool in spools :
+        if self.slot_occupation not in [False, None]:
+            for spool in self.slot_occupation :
                 logging.info(f"found spool: {spool['filament']['name']} ")
                 if int(spool['location'].split(':')[1]) == slot :
                     await self._log_n_send(f"Slot {slot} is already assigned to spool {spool['filament']['name']} (id: {spool['id']})")
@@ -790,6 +790,7 @@ class SpoolManager:
             await self._log_n_send(f"Failed to set spool {spool_id} for machine {machine_hostname}")
             return False
         await self._log_n_send(f"Spool {spool_id} set for machine {machine_hostname} @ slot {slot}")
+        self.get_spools_for_machine(silent=True)
         return True
 
     async def clear_spool_slots(self) -> bool:
@@ -841,10 +842,8 @@ class SpoolManager:
         Uses metadata from the gcode to identify the filaments and runs some verifications
         based on the filament type and the amount of filament left in spoolman db.
         '''
-        logging.info(f"Checking filament")
-        await self._log_n_send("="*32)
+        logging.info(f"Checking filaments")
         await self._log_n_send(f"Checking filament consistency: ")
-        await self._log_n_send("="*32)
         self.klippy_apis.pause_print()
         try:
             virtual_sdcard = await self.klippy_apis.query_objects({"virtual_sdcard": None})
