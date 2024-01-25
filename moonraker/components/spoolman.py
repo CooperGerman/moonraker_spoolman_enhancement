@@ -521,7 +521,6 @@ class SpoolManager:
         # if spool_id not in filament_slots :
         found = False
         for spoolid in self.slot_occupation:
-            await self._log_n_send(msg)
             if int(spoolid['id']) == spool_id :
                 msg = "{}- slot: {}".format(CONSOLE_TAB, int(spool_info['location'].split(self.printer_info["hostname"]+':')[1])) # Special space characters used as they will be siplayed in gcode console
                 await self._log_n_send(msg)
@@ -888,8 +887,8 @@ class SpoolManager:
             raise Exception(f"Failed to extract metadata from {filename}")
 
         # check that active spool is in machine's slots
-        active_spool = await self._get_active_spool()
-        if active_spool is None:
+        active_spool_id = await self._get_active_spool()
+        if active_spool_id is None:
             msg = f"No active spool set"
             await self._log_n_send(msg)
             self.server.send_event(
@@ -905,15 +904,14 @@ class SpoolManager:
                 "spoolman:check_failure", {"message" : msg}
             )
             return False
-        spools = self.slot_occupation
         found = False
-        for spool in spools :
-            if int(spool['id']) == active_spool :
+        for spool in self.slot_occupation :
+            if int(spool['id']) == active_spool_id :
                 found = True
         if not found :
-            await self._log_n_send(f"Active spool {active_spool} is not assigned to this machine")
+            await self._log_n_send(f"Active spool {active_spool_id} is not assigned to this machine")
             await self._log_n_send(f"Run : ")
-            await self._log_n_send(f"{CONSOLE_TAB}SET_SPOOL_SLOT ID={active_spool} SLOT=integer")
+            await self._log_n_send(f"{CONSOLE_TAB}SET_SPOOL_SLOT ID={active_spool_id} SLOT=integer")
             return False
 
         if not self.slot_occupation:
