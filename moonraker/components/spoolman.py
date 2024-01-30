@@ -692,7 +692,7 @@ class SpoolManager:
         webrequest = WebRequest(
             endpoint = f"{self.spoolman_url}/spools/{spool_id}",
             args=args,
-            request_type=RequestType.PATCH,
+            request_type=RequestType.POST,
         )
         try :
             await self._proxy_spoolman_request(webrequest)
@@ -781,7 +781,7 @@ class SpoolManager:
         webrequest = WebRequest(
             endpoint = f"{self.spoolman_url}/spools/{spool_id}",
             args=args,
-            request_type=RequestType.PATCH,
+            request_type=RequestType.POST,
         )
         try :
             await self._proxy_spoolman_request(webrequest)
@@ -822,7 +822,7 @@ class SpoolManager:
                 webrequest = WebRequest(
                     endpoint = f"{self.spoolman_url}/spools/{spool['id']}",
                     args=args,
-                    request_type=RequestType.PATCH,
+                    request_type=RequestType.POST,
                 )
                 try :
                     await self._proxy_spoolman_request(webrequest)
