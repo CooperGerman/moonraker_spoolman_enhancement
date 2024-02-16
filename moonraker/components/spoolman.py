@@ -836,36 +836,34 @@ class SpoolManager:
             await self._log_n_send(msg)
             return False
 
-    async def check_filament(self):
+    async def check_filament(self, debug=False):
         '''
         Uses metadata from the gcode to identify the filaments and runs some verifications
         based on the filament type and the amount of filament left in spoolman db.
         '''
         logging.info(f"Checking filaments")
         await self._log_n_send(f"Checking filament consistency: ")
-        self.klippy_apis.pause_print()
+        await self.klippy_apis.pause_print()
         try:
-            virtual_sdcard = await self.klippy_apis.query_objects({"virtual_sdcard": None})
             print_stats = await self.klippy_apis.query_objects({"print_stats": None})
         except Exception:
             # Klippy not connected
-            logging.error(f"Klippy not retrieve virtual_sdcard or print_stats")
+            logging.error(f"Could not retrieve print_stats through klippy API")
             self.server.send_event(
-                "spoolman:check_failure", {"message" : f"Klippy not retrieve virtual_sdcard or print_stats"}
+                "spoolman:check_failure", {"message" : f"Could not retrieve print_stats through klippy API"}
             )
             return False
-
         filename = os.path.join('/home', 'uboe', 'printer_data', 'gcodes', print_stats["print_stats"]["filename"])
         state = print_stats["print_stats"]["state"]
 
-        if state not in ['printing', 'paused']:
+        if state not in ['printing', 'paused'] :
             # No print active
             msg = f"No print active, cannot get gcode from file (state: {state})"
             await self._log_n_send(msg)
             self.server.send_event(
                 "spoolman:check_failure", {"message" : msg}
             )
-            return False
+            if not debug: return False
 
         # Get gcode from file
         if filename is None:
@@ -873,16 +871,16 @@ class SpoolManager:
             self.server.send_event(
                 "spoolman:check_failure", {"message" : "Filename is None"}
             )
-            return False
+            if not debug: return False
 
         metadata: Dict[str, Any] = {}
         if not filename:
             logging.info(f"No filemame retrieved: {filename}")
-            sys.exit(-1)
+            if not debug: sys.exit(-1)
         try:
             metadata = extract_metadata(filename, False)
         except Exception:
-            raise Exception(f"Failed to extract metadata from {filename}")
+            if not debug: raise Exception(f"Failed to extract metadata from {filename}")
 
         # check that active spool is in machine's slots
         active_spool_id = await self._get_active_spool()
@@ -892,16 +890,14 @@ class SpoolManager:
             self.server.send_event(
                 "spoolman:check_failure", {"message" : msg}
             )
-            return False
+            if not debug: return False
 
         if self.slot_occupation == False:
-            if state not in ['paused', 'cancelled', 'complete', 'standby']:
-                await self.klippy_apis.pause_print()
             msg = f"Failed to retrieve spools from spoolman"
             self.server.send_event(
                 "spoolman:check_failure", {"message" : msg}
             )
-            return False
+            if not debug: return False
         found = False
         for spool in self.slot_occupation :
             if int(spool['id']) == active_spool_id :
@@ -910,35 +906,31 @@ class SpoolManager:
             await self._log_n_send(f"Active spool {active_spool_id} is not assigned to this machine")
             await self._log_n_send(f"Run : ")
             await self._log_n_send(f"{CONSOLE_TAB}SET_SPOOL_SLOT ID={active_spool_id} SLOT=integer")
-            return False
+            if not debug: return False
 
         if not self.slot_occupation:
-            if state not in ['paused', 'cancelled', 'complete', 'standby']:
-                await self.klippy_apis.pause_print()
             msg = f"No spools assigned to machine {self.printer_info['hostname']}"
             self.server.send_event(
                 "spoolman:check_failure", {"message" : msg}
             )
-            return False
+            if not debug: return False
 
         ret = await self.verify_consistency(metadata, self.slot_occupation)
         if ret :
             msg = f"Slicer setup and spoolman db are consistent"
             await self._log_n_send(msg)
-            self.klippy_apis.resume_print()
-            return True
+            await self.klippy_apis.resume_print()
+            if not debug: return True
         else :
             msg1 = f"FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED! PAUSING PRINT."
             await self._log_n_send(msg1)
             msg2 = f"Please check the spoolman setup and physical spools to match the slicer setup."
             await self._log_n_send(msg2)
             #if printer is runnning, pause it
-            if state not in ['paused', 'cancelled', 'complete', 'standby']:
-                await self.klippy_apis.pause_print()
             self.server.send_event(
                 "spoolman:check_failure", {"message" : msg1+msg2}
             )
-            return False
+            if not debug: return False
 
     async def __spool_info_notificator(self, web_request: WebRequest):
         '''
