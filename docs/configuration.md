@@ -152,6 +152,10 @@ enable_inotify_warnings: True
 #   to add a duplicate watch or when inotify encounters an error.  On some
 #   file systems inotify may not work as expected, this gives users the
 #   option to suppress warnings when necessary.  The default is True.
+enable_config_write_access: True
+#   When enabled the configuration folder is writable over the API.  Some
+#   installations, such as those in public areas, may wish to lock out
+#   configuration changes.  The default is True.
 ```
 
 !!! Note
@@ -433,11 +437,6 @@ aspect_ratio: 4:3
     | jMuxer | `jmuxer-stream` | Mainsail |
     | HTTP Page | `iframe`| Fluidd |
 
-## Optional Components
-
-Optional Components are only loaded if present in `moonraker.conf`.  This
-includes components that may not have any configuration.
-
 ### `[authorization]`
 
 The `[authorization]` section provides configuration for Moonraker's
@@ -469,8 +468,8 @@ trusted_clients:
 #   must be expressed in CIDR notation (see http://ip.sb/cidr for more info).
 #   For example, an entry of 192.168.1.0/24 will authorize IPs in the range of
 #   192.168.1.1 - 192.168.1.254.  Note that when specifying IPv4 ranges the
-#   last segment of the ip address must be 0. The default is no clients are
-#   trusted.
+#   last segment of the ip address must be 0. The default is no IPs or
+#   domains are trusted.
 cors_domains:
   http://klipper-printer.local
   http://second-printer.local:7125
@@ -497,6 +496,19 @@ default_source: moonraker
 #   The default source used to authenticate user logins. Can be "ldap" or
 #   "moonraker"  The default is "moonraker".
 ```
+
+!!! Tip
+    When configuring the `trusted_clients` option it is generally recommended
+    to stick with IP ranges and avoid including domain names.  When attempting to
+    authenticate a request against a domain name Moonraker must perform a DNS
+    lookup. If the DNS service is not available then authentication will fail
+    and an error will be returned.  In addition, DNS lookups will introduce delay
+    in the response.
+
+## Optional Components
+
+Optional Components are only loaded if present in `moonraker.conf`.  This
+includes components that may not have any configuration.
 
 ### `[ldap]`
 

@@ -30,7 +30,9 @@ The format is based on [Keep a Changelog].
 - **history**:  Added a check for previous jobs not finished (ie: when power is
   lost during a print).  These jobs will report their status as `interrupted`.
 - **build**: Added support for optional speedup dependencies `uvloop` and `msgspec`
-- **update_manager**: Add support for "zipped" application updates
+- **update_manager**: Added support for "zipped" application updates
+- **file_manager**: Added `enable_config_write_access` option
+- **machine**: Add support for system peripheral queries
 
 ### Fixed
 
@@ -46,6 +48,7 @@ The format is based on [Keep a Changelog].
 - **klippy_connection**:  Fixed a race condition that can result in
   skipped subscription updates.
 - **configheler**: Fixed inline comment parsing.
+- **authorization**: Fixed blocking call to `socket.getfqdn()`
 
 ### Changed
 
@@ -77,6 +80,8 @@ The format is based on [Keep a Changelog].
 - **power**:  Bound services are now processed during initialization when
   `initial_state` is configured.
 - **gpio**:  Migrate from libgpiod to python-periphery
+- **authorization**:  The authorization module is now loaded as part of Moonraker's
+  core.
 
 ## [0.8.0] - 2023-02-23
 
