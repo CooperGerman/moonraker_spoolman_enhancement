@@ -700,7 +700,7 @@ class SpoolManager:
             logging.error(f"Failed to unset spool {spool_id} for machine {machine_hostname}: {e}")
             await self._log_n_send(f"Failed to unset spool {spool_id} for machine {machine_hostname}")
             return False
-        self.get_spools_for_machine(silent=True)
+        await self.get_spools_for_machine(silent=True)
         return True
 
     async def set_spool_slot(self, spool_id : int, slot : int=None) -> bool:
@@ -727,8 +727,10 @@ class SpoolManager:
             msg = f"Trying to set spool {spool_id} for machine {self.printer_info['hostname']} but no slot number provided."
             await self._log_n_send(msg)
             return False
-        elif (slot == None) and (self.filament_slots == 1) :
+        elif not slot and (self.filament_slots == 1) :
             slot = 0
+            await self.set_active_slot(slot)
+            await self._log_n_send(f"{CONSOLE_TAB*2}Setting slot 0 as active (single slot machine)")
         elif slot > self.filament_slots-1 :
             msg = f"Trying to set spool {spool_id} for machine {self.printer_info['hostname']} @ slot {slot} but only {self.filament_slots} slots are available. Please check the spoolman or moonraker [spoolman] setup."
             await self._log_n_send(msg)
@@ -737,13 +739,15 @@ class SpoolManager:
         # first check if the spool is not already assigned to a machine
         spool_info = await self.get_info_for_spool(spool_id)
         if 'location' in spool_info:
-            if spool_info['location'] != "" :
+            if spool_info['location'] :
+                # if the spool is already assigned to current machine
                 if spool_info['location'].split(':')[0] == self.printer_info["hostname"] :
-                    await self._log_n_send(f"Spool {spool_id} is already assigned to this machine @ slot {spool_info['location'].split(':')[1]}")
+                    await self._log_n_send(f"Spool {spool_info['filament']['name']} (id: {spool_id}) is already assigned to this machine @ slot {spool_info['location'].split(':')[1]}")
                     if int(spool_info['location'].split(':')[1]) == slot :
                         await self._log_n_send(f"Updating slot for spool {spool_info['filament']['name']} (id: {spool_id}) to {slot}")
+                # if the spool is already assigned to another machine
                 else :
-                    await self._log_n_send(f"Spool {spool_id} is already assigned to another machine: {spool_info['location']}")
+                    await self._log_n_send(f"Spool {spool_info['filament']['name']} (id: {spool_id}) is already assigned to another machine: {spool_info['location']}")
                     return False
 
         # then check that no spool is already assigned to the slot of this machine
@@ -790,7 +794,7 @@ class SpoolManager:
             await self._log_n_send(f"Failed to set spool {spool_id} for machine {machine_hostname}")
             return False
         await self._log_n_send(f"Spool {spool_id} set for machine {machine_hostname} @ slot {slot}")
-        self.get_spools_for_machine(silent=True)
+        await self.get_spools_for_machine(silent=True)
         return True
 
     async def clear_spool_slots(self) -> bool:
@@ -831,6 +835,7 @@ class SpoolManager:
                     await self._log_n_send(f"Failed to clear spool {spool['id']} for machine {machine_hostname}")
                     return False
                 await self._log_n_send(f"Spool {spool['id']} cleared for machine {machine_hostname}")
+                await self.get_spools_for_machine(silent=True)
             return True
         else :
             msg = f"No spools for machine {self.printer_info['hostname']}"
