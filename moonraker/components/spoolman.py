@@ -561,13 +561,14 @@ class SpoolManager:
         # build the equivalent list for the gcode metadata
         metadata_tools = {}
         for id, filament in enumerate(mdata_filaments):
+            fil_usage = float(mdata_filament_usage[id]) if len(mdata_filament_usage) > id else 0
             if not filament == 'EMPTY' :
-                metadata_tools[id] = {'name' : filament, 'usage' : float(mdata_filament_usage[id])}
-            elif filament == 'EMPTY' and not (float(mdata_filament_usage[id]) == 0) :
+                metadata_tools[id] = {'name' : filament, 'usage' : fil_usage}
+            elif filament == 'EMPTY' and not (fil_usage == 0) :
                 msg = f"Filament usage for tool {id} is not 0 but filament is EMPTY placeholder. Please check your slicer setup and regenerate the gcode file."
                 await self._log_n_send(msg)
                 return False
-            elif filament == 'EMPTY' and (float(mdata_filament_usage[id]) == 0) :
+            elif filament == 'EMPTY' and (fil_usage == 0) :
                 # seems coherent
                 pass
             else :
@@ -617,7 +618,7 @@ class SpoolManager:
 
         return True
 
-    async def get_spools_for_machine(self, silent=False) -> [Dict[str, Any]]:
+    async def get_spools_for_machine(self, silent=False) -> List[Dict[str, Any]]:
         '''
         Gets all spools assigned to the current machine
         '''
@@ -843,7 +844,7 @@ class SpoolManager:
         '''
         logging.info(f"Checking filaments")
         await self._log_n_send(f"Checking filament consistency: ")
-        await self.klippy_apis.pause_print()
+        await self.klippy_apis.run_gcode("PAUSE B=0")
         try:
             print_stats = await self.klippy_apis.query_objects({"print_stats": None})
         except Exception:
@@ -930,6 +931,7 @@ class SpoolManager:
             self.server.send_event(
                 "spoolman:check_failure", {"message" : msg1+msg2}
             )
+            self.klippy_apis.run_gcode("M3000 P200")
             if not debug: return False
 
     async def __spool_info_notificator(self, web_request: WebRequest):
