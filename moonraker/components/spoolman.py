@@ -648,7 +648,7 @@ class SpoolManager:
         if spools:
             if not silent : await self._log_n_send(f"Spools for machine:")
             # create a table of size len(spools)
-            table = [None for x in range(len(spools))]
+            table = [None for __ in range(self.filament_slots)]
             for spool in spools:
                 slot = spool['location'].split(machine_hostname+':')[1]
                 if not slot :
@@ -657,7 +657,10 @@ class SpoolManager:
                     table[int(slot)] = spool
             if not silent :
                 for i, spool in enumerate(table) :
-                    await self._log_n_send(f"{CONSOLE_TAB}{i} : {spool['filament']['name']}")
+                    if spool :
+                        await self._log_n_send(f"{CONSOLE_TAB}{i} : {spool['filament']['name']}")
+                    else :
+                        await self._log_n_send(f"{CONSOLE_TAB}{i} : empty")
         else :
             if not silent : await self._log_n_send(f"No spools assigned to machine: {machine_hostname}")
             return False
