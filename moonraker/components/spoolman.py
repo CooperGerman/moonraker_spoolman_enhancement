@@ -724,6 +724,7 @@ class SpoolManager:
         returns:
             @return: True if successful, False otherwise
         '''
+        await self.get_spools_for_machine(silent=True)
         if spool_id == None :
             msg = f"Trying to set spool but no spool id provided."
             await self._log_n_send(msg)
