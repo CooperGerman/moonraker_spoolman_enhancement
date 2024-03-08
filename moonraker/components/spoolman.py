@@ -741,8 +741,6 @@ class SpoolManager:
             return False
         elif not slot and (self.filament_slots == 1) :
             slot = 0
-            await self.set_active_slot(slot)
-            await self._log_n_send(f"{CONSOLE_TAB*2}Setting slot 0 as active (single slot machine)")
         elif slot > self.filament_slots-1 :
             msg = f"Trying to set spool {spool_id} for machine {self.printer_info['hostname']} @ slot {slot} but only {self.filament_slots} slots are available. Please check the spoolman or moonraker [spoolman] setup."
             await self._log_n_send(msg)
@@ -785,7 +783,6 @@ class SpoolManager:
         machine_hostname = self.printer_info["hostname"]
         logging.info(f"Setting spool {spool_info['filament']['name']} (id: {spool_info['id']}) for machine: {machine_hostname} @ slot {slot}")
         # get spool info from spoolman
-        spool_info = await self.get_info_for_spool(spool_id)
         body = {
             "location"         : f"{machine_hostname}:{slot}",
         }
@@ -807,6 +804,9 @@ class SpoolManager:
             return False
         await self._log_n_send(f"Spool {spool_id} set for machine {machine_hostname} @ slot {slot}")
         await self.get_spools_for_machine(silent=True)
+        if slot == 0 and (self.filament_slots == 1) :
+            await self.set_active_slot(slot)
+            await self._log_n_send(f"{CONSOLE_TAB*2}Setting slot 0 as active (single slot machine)")
         return True
 
     async def clear_spool_slots(self) -> bool:
