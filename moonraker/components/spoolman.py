@@ -580,7 +580,7 @@ class SpoolManager:
         # check list length
         if len(sm_tools) != len(metadata_tools):
             msg = f"Number of tools mismatch between spoolman slicer and klipper: {len(sm_tools)} != {len(metadata_tools)}"
-            # mismatch = True
+            mismatch = "warning"
             await self._log_n_send(msg)
 
         # check filaments names for each tool
@@ -588,7 +588,7 @@ class SpoolManager:
             # if tool_id from slicer is not in spoolman db
             if tool_id not in sm_tools :
                 msg = f"Tool id {tool_id} of machine {self.printer_info['hostname']} not assigned to a spool in spoolman db"
-                mismatch = True
+                mismatch = "warning"
                 await self._log_n_send(msg)
             else :
                 # if filament name from slicer is not the same as the one in spoolman db
@@ -597,32 +597,30 @@ class SpoolManager:
                     await self._log_n_send(f"Filament mismatch spoolman vs slicer @id {tool_id}")
                     await self._log_n_send(f"{CONSOLE_TAB}- {sm_tools[tool_id]['filament']['name']} != {filament['name']}")
                     if filament['usage'] > 0 :
-                        mismatch = True
+                        mismatch = "critical"
                     else :
                         await self._log_n_send(f"{CONSOLE_TAB}  * This filament is not used during this print (not pausing the printer)")
 
-        if mismatch:
-            return False
+        if mismatch: return mismatch
 
         # check that the amount of filament left in the spool is sufficient
         # get the amount of filament needed for each tool
         for tool_id, filament in metadata_tools.items():
             if filament['usage'] > sm_tools[tool_id]['remaining_weight']:
                 msg = f"WARNING : Filament amount insufficient for spool {filament['name']}: {sm_tools[tool_id]['remaining_weight']*100/100} < {filament['usage']*100/100}"
-                mismatch = True
+                mismatch = "critical"
                 await self._log_n_send(msg)
                 msg = f"Expect filament runout for machine {self.printer_info['hostname']}, or setup the mmu in order to avoid this."
                 await self._log_n_send(msg)
-        if mismatch:
-            return False
+        if mismatch: return mismatch
 
         # Check that the active spool matches the spool from metadata when in single extruder mode
         if len(metadata_tools) == 1 :
             if self.spool_id != sm_tools[0]['id'] :
                 msg = f"Active spool mismatch: {self.spool_id} != {sm_tools[0]['id']}"
-                mismatch = True
+                mismatch = "critical"
                 await self._log_n_send(msg)
-                return False
+                return mismatch
 
         return True
 
@@ -861,7 +859,6 @@ class SpoolManager:
         '''
         logging.info(f"Checking filaments")
         await self._log_n_send(f"Checking filament consistency: ")
-        await self.klippy_apis.run_gcode("PAUSE B=0")
         try:
             print_stats = await self.klippy_apis.query_objects({"print_stats": None})
         except Exception:
@@ -937,20 +934,26 @@ class SpoolManager:
         if ret :
             msg = f"Slicer setup and spoolman db are consistent"
             await self._log_n_send(msg)
-            if self.klippy_apis.query_objects({"pause_resume": None}['is_paused']) :
-                await self.klippy_apis.resume_print()
             if not debug: return True
         else :
-            msg1 = f"FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED! PAUSING PRINT."
-            await self._log_n_send(msg1)
-            msg2 = f"Please check the spoolman setup and physical spools to match the slicer setup."
-            await self._log_n_send(msg2)
-            #if printer is runnning, pause it
-            self.server.send_event(
-                "spoolman:check_failure", {"message" : msg1+msg2}
-            )
-            self.klippy_apis.run_gcode("M300 P2000 S4000")
-            if not debug: return False
+            if ret == "critical":
+                msg1 = f"FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED! PAUSING PRINT."
+                await self._log_n_send(msg1)
+                msg2 = f"Please check the spoolman setup and physical spools to match the slicer setup."
+                await self._log_n_send(msg2)
+                #if printer is runnning, pause it
+                self.server.send_event(
+                    "spoolman:check_failure", {"message" : msg1+msg2}
+                )
+                self.klippy_apis.run_gcode("M300 P2000 S4000")
+                if not self.klippy_apis.query_objects({"pause_resume": None}['is_paused']) :
+                    await self.klippy_apis.pause_print()
+                if not debug: return False
+            else :
+                msg1 = f"FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED!"
+                await self._log_n_send(msg1)
+                msg2 = f"Minor mismatches have been found, proceeding to print."
+                await self._log_n_send(msg2)
 
     async def __spool_info_notificator(self, web_request: WebRequest):
         '''
