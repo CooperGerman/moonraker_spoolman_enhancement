@@ -580,7 +580,7 @@ class SpoolManager:
         # check list length
         if len(sm_tools) != len(metadata_tools):
             msg = f"Number of tools mismatch between spoolman slicer and klipper: {len(sm_tools)} != {len(metadata_tools)}"
-            mismatch = True
+            # mismatch = True
             await self._log_n_send(msg)
 
         # check filaments names for each tool
