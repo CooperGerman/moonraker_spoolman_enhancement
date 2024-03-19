@@ -540,7 +540,7 @@ class SpoolManager:
         )
         return spool_id
 
-    async def verify_consistency(self, metadata, spools):
+    async def verify_consistency(self, metadata, spools) -> List[str, list]:
         '''
         Verifies that the filament type, name, color and amount are consistent with the spoolman db
         parameters:
@@ -567,7 +567,7 @@ class SpoolManager:
             elif filament == 'EMPTY' and not (fil_usage == 0) :
                 msg = f"Filament usage for tool {id} is not 0 but filament is EMPTY placeholder. Please check your slicer setup and regenerate the gcode file."
                 await self._log_n_send(msg)
-                return False
+                return mismatch, []
             elif filament == 'EMPTY' and (fil_usage == 0) :
                 # seems coherent
                 pass
@@ -584,6 +584,7 @@ class SpoolManager:
             await self._log_n_send(msg)
 
         # check filaments names for each tool
+        swap_table = [None for __ in range(self.filament_slots)]
         for tool_id, filament in metadata_tools.items():
             # if tool_id from slicer is not in spoolman db
             if tool_id not in sm_tools :
@@ -597,22 +598,40 @@ class SpoolManager:
                     await self._log_n_send(f"Filament mismatch spoolman vs slicer @id {tool_id}")
                     await self._log_n_send(f"{CONSOLE_TAB}- {sm_tools[tool_id]['filament']['name']} != {filament['name']}")
                     if filament['usage'] > 0 :
+                        # if this filament can be found on another slot, raise a warning and save the new slot number to replace in gcode later
                         mismatch = "critical"
+                        for spool in spools :
+                            if spool['filament']['name'] == filament['name'] :
+                                msg = f"Filament {filament['name']} is found in another slot: {spool['location'].split(':')[1]}"
+                                mismatch = "warning"
+                                swap_table[tool_id] = int(spool['location'].split(':')[1])
+                                await self._log_n_send(msg)
                     else :
                         await self._log_n_send(f"{CONSOLE_TAB}  * This filament is not used during this print (not pausing the printer)")
 
-        if mismatch: return mismatch
+        # verify swap table is consistent (not more than one index pointing to same value)
+        for i in range(len(swap_table)) :
+            if swap_table.count(swap_table[i]) > 1 :
+                msg = f"Swap table is not consistent: {swap_table}, more than one slot has been swapped to same slot."
+                mismatch = "critical"
+                await self._log_n_send(msg)
+
+        if mismatch == "critical": return mismatch, swap_table
 
         # check that the amount of filament left in the spool is sufficient
         # get the amount of filament needed for each tool
         for tool_id, filament in metadata_tools.items():
-            if filament['usage'] > sm_tools[tool_id]['remaining_weight']:
-                msg = f"WARNING : Filament amount insufficient for spool {filament['name']}: {sm_tools[tool_id]['remaining_weight']*100/100} < {filament['usage']*100/100}"
+            # if the tool has been swapped, use the new tool id
+            if swap_table[tool_id] :
+                _tool_id = int(swap_table[tool_id])
+            # else use the original tool id and verify that the amount of filament left is sufficient
+            if filament['usage'] > sm_tools[_tool_id]['remaining_weight']:
+                msg = f"WARNING : Filament amount insufficient for spool {filament['name']}: {sm_tools[_tool_id]['remaining_weight']*100/100} < {filament['usage']*100/100}"
                 mismatch = "critical"
                 await self._log_n_send(msg)
                 msg = f"Expect filament runout for machine {self.printer_info['hostname']}, or setup the mmu in order to avoid this."
                 await self._log_n_send(msg)
-        if mismatch: return mismatch
+        if mismatch == "critical": return mismatch, swap_table
 
         # Check that the active spool matches the spool from metadata when in single extruder mode
         if len(metadata_tools) == 1 :
@@ -622,7 +641,7 @@ class SpoolManager:
                 await self._log_n_send(msg)
                 return mismatch
 
-        return True
+        return mismatch, swap_table
 
     async def get_spools_for_machine(self, silent=False) -> List[Dict[str, Any]]:
         '''
@@ -930,13 +949,13 @@ class SpoolManager:
             )
             if not debug: return False
 
-        ret = await self.verify_consistency(metadata, self.slot_occupation)
-        if ret :
+        mismatch, swap_table = await self.verify_consistency(metadata, self.slot_occupation)
+        if mismatch :
             msg = f"Slicer setup and spoolman db are consistent"
             await self._log_n_send(msg)
             if not debug: return True
         else :
-            if ret == "critical":
+            if mismatch == "critical":
                 msg1 = f"FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED! PAUSING PRINT."
                 await self._log_n_send(msg1)
                 msg2 = f"Please check the spoolman setup and physical spools to match the slicer setup."
@@ -954,6 +973,22 @@ class SpoolManager:
                 await self._log_n_send(msg1)
                 msg2 = f"Minor mismatches have been found, proceeding to print."
                 await self._log_n_send(msg2)
+
+        # if swap table is not empty, prompt user for automatic tools swap
+        if swap_table :
+            msg = f"Swap table: {swap_table}"
+            await self._log_n_send(msg)
+            msg = f"Proceeding to automatic tools swap"
+            await self._log_n_send(msg)
+            self._swap_tools_in_gcode(swap_table)
+
+        if not debug: return True
+
+    async def _swap_tools_in_gcode(self, swap_table):
+        '''
+        Swaps the tools in the gcode file according to the swap_table
+        '''
+        pass
 
     async def __spool_info_notificator(self, web_request: WebRequest):
         '''
