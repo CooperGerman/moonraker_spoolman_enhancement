@@ -909,7 +909,7 @@ class SpoolManager:
 
         # check that active spool is in machine's slots
         active_spool_id = await self._get_active_spool()
-        if active_spool_id is None:
+        if active_spool_id is None and self.filament_slots == 1:
             msg = f"No active spool set"
             await self._log_n_send(msg)
             self.server.send_event(
