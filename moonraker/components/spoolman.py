@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 import asyncio
+from asyncio.log import logger
 import logging
 import os
 import sys
@@ -86,9 +87,9 @@ class SpoolManager:
         self.filament_slots = config.getint(
             "filament_slots", default=1, minval=1)
         self.slot_occupation = {}
-        if self.filament_slots < 1:
-            self._log_n_send(
-                f"Number of filament slots is not set or is less than 1. Please check the spoolman or moonraker [spoolman] setup.")
+        if self.filament_slots < 1 :
+            logging.critical(f"Number of filament slots is less than 1. Please check the spoolman or moonraker [spoolman] setup.")
+            return
         self.printer_info = self.server.get_host_info()
         # ################################ End
         self.server.register_remote_method(
@@ -344,7 +345,7 @@ class SpoolManager:
         )
         logging.info(f"Setting active spool to: {spool_id}")
 
-    async def set_active_slot(self, slot: int = None) -> None:
+    async def set_active_slot(self, slot = None) -> None:
         '''
         Search for spool id matching the slot number and set it as active
         '''
@@ -496,20 +497,24 @@ class SpoolManager:
         logging.error(msg)
         await self.klippy_apis.run_gcode(f"M118 {msg}", None)
 
-    async def get_info_for_spool(self, spool_id: int):
-        logging.info(f"spool id received: {spool_id}")
-        args = {
-            "request_method": "GET",
-            "path": f"/v1/spool/{spool_id}",
-            # "query" : f"spool_id={spool_id}",
+    async def get_info_for_spool(self, spool_id : int):
+        response = await self.http_client.request(
+                method="GET",
+                url=f"{self.spoolman_url}/v1/spool/{spool_id}",
+            )
+        if response.status_code == 404:
+            logging.info(f"Spool ID {spool_id} not found")
+            return False
+        elif response.has_error():
+            err_msg = self._get_response_error(response)
+            logging.info(f"Attempt to get spool info failed: {err_msg}")
+            return False
+        else:
+            logging.info(f"Found Spool ID {self.spool_id} on spoolman instance")
 
-        }
-        webrequest = WebRequest(
-            endpoint=f"{self.spoolman_url}/spools/{spool_id}",
-            args=args,
-            request_type=RequestType.GET,
-        )
-        spool_info = await self._proxy_spoolman_request(webrequest)
+        spool_info = response.json()
+        logging.info(f"Spool info: {spool_info}")
+
         return spool_info
 
     async def get_spool_info(self, sid: int = None):
@@ -531,21 +536,21 @@ class SpoolManager:
             return False
 
         spool_info = await self.get_info_for_spool(spool_id)
+        if not spool_info :
+            msg = f"Spool id {spool_id} not found"
+            await self._log_n_send(msg)
+            return False
         msg = f"Active spool is: {spool_info['filament']['name']} (id : {spool_info['id']})"
         await self._log_n_send(msg)
-        # Special space characters used as they will be siplayed in gcode console
-        msg = f"{CONSOLE_TAB}- used: {int(spool_info['used_weight'])} g"
+        msg = f"{CONSOLE_TAB}- used: {int(spool_info['used_weight'])} g" # Special space characters used as they will be displayed in gcode console
         await self._log_n_send(msg)
-        # Special space characters used as they will be siplayed in gcode console
-        msg = f"{CONSOLE_TAB}- remaining: {int(spool_info['remaining_weight'])} g"
+        msg = f"{CONSOLE_TAB}- remaining: {int(spool_info['remaining_weight'])} g" # Special space characters used as they will be displayed in gcode console
         await self._log_n_send(msg)
         # if spool_id not in filament_slots :
         found = False
         for spoolid in self.slot_occupation:
-            if int(spoolid['id']) == spool_id:
-                # Special space characters used as they will be siplayed in gcode console
-                msg = "{}- slot: {}".format(CONSOLE_TAB, int(
-                    spool_info['location'].split(self.printer_info["hostname"]+':')[1]))
+            if int(spoolid['id']) == spool_id :
+                msg = "{}- slot: {}".format(CONSOLE_TAB, int(spool_info['location'].split(self.printer_info["hostname"]+':')[1])) # Special space characters used as they will be displayed in gcode console
                 await self._log_n_send(msg)
                 found = True
         if not found:
@@ -553,8 +558,7 @@ class SpoolManager:
             await self._log_n_send(msg)
             msg = "Run : "
             await self._log_n_send(msg)
-            # Special space characters used as they will be siplayed in gcode console
-            msg = f"{CONSOLE_TAB}SET_SPOOL_SLOT ID={spool_id} SLOT=integer"
+            msg = f"{CONSOLE_TAB}SET_SPOOL_SLOT ID={spool_id} SLOT=integer" # Special space characters used as they will be displayed in gcode console
             await self._log_n_send(msg)
             return False
 
@@ -697,25 +701,24 @@ class SpoolManager:
         try:
             spools = await self._proxy_spoolman_request(webrequest)
         except Exception as e:
-            if not silent:
+            if not silent :
                 await self._log_n_send(f"Failed to retrieve spools from spoolman: {e}")
-            return False
-        if self.filament_slots < len(spools):
-            if not silent:
+            return []
+        if self.filament_slots < len(spools) :
+            if not silent :
                 await self._log_n_send(f"Number of spools assigned to machine {machine_hostname} is greater than the number of slots available on the machine. Please check the spoolman or moonraker [spoolman] setup.")
-            return False
+            return []
         if spools:
             if not silent:
-                await self._log_n_send(f"Spools for machine:")
+                await self._log_n_send("Spools for machine:")
             # create a table of size len(spools)
             table = [None for __ in range(self.filament_slots)]
             for spool in spools:
                 slot = spool['location'].split(machine_hostname+':')[1]
-                if not slot:
-                    if not silent:
-                        self._log_n_send(
-                            f"location field for {spool['filament']['name']} @ {spool['id']} in spoolman db is not formatted correctly. Please check the spoolman setup.")
-                else:
+                if not slot :
+                    if not silent :
+                        await self._log_n_send(f"location field for {spool['filament']['name']} @ {spool['id']} in spoolman db is not formatted correctly. Please check the spoolman setup.")
+                else :
                     table[int(slot)] = spool
             if not silent:
                 for i, spool in enumerate(table):
@@ -723,8 +726,8 @@ class SpoolManager:
                         await self._log_n_send(f"{CONSOLE_TAB}{i} : {spool['filament']['name']}")
                     else:
                         await self._log_n_send(f"{CONSOLE_TAB}{i} : empty")
-        else:
-            if not silent:
+        else :
+            if not silent :
                 await self._log_n_send(f"No spools assigned to machine: {machine_hostname}")
             return False
         self.slot_occupation = spools
@@ -771,7 +774,7 @@ class SpoolManager:
         await self.get_spools_for_machine(silent=True)
         return True
 
-    async def set_spool_slot(self, spool_id: int, slot: int = None) -> bool:
+    async def set_spool_slot(self, spool_id : int, slot : int) -> bool:
         '''
         Sets the spool with id=id for the current machine into optional slot number if mmu is enabled.
 
@@ -971,8 +974,8 @@ class SpoolManager:
 
         # check that active spool is in machine's slots
         active_spool_id = await self._get_active_spool()
-        if active_spool_id is None:
-            msg = "No active spool set"
+        if active_spool_id is None and self.filament_slots == 1:
+            msg = f"No active spool set"
             await self._log_n_send(msg)
             self.server.send_event(
                 "spoolman:check_failure", {"message": msg}
@@ -1022,8 +1025,8 @@ class SpoolManager:
                 self.server.send_event(
                     "spoolman:check_failure", {"message": msg1+msg2}
                 )
-                self.klippy_apis.run_gcode("M300 P2000 S4000")
-                if not self.klippy_apis.query_objects({"pause_resume": None}['is_paused']):
+                await self.klippy_apis.run_gcode("M300 P2000 S4000")
+                if not self.klippy_apis.query_objects({"pause_resume": None}['is_paused']) :
                     await self.klippy_apis.pause_print()
                 if not debug:
                     return False
