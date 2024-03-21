@@ -56,18 +56,6 @@ if TYPE_CHECKING:
     SudoReturn = Union[Awaitable[Tuple[str, bool]], Tuple[str, bool]]
     SudoCallback = Callable[[], SudoReturn]
 
-DEFAULT_ALLOWED_SERVICES = [
-    "klipper_mcu",
-    "webcamd",
-    "MoonCord",
-    "KlipperScreen",
-    "moonraker-telegram-bot",
-    "moonraker-obico",
-    "sonar",
-    "crowsnest",
-    "octoeverywhere",
-    "ratos-configurator"
-]
 CGROUP_PATH = "/proc/1/cgroup"
 SCHED_PATH = "/proc/1/sched"
 SYSTEMD_PATH = "/etc/systemd/system"
@@ -96,6 +84,7 @@ class Machine:
         dist_info = {'name': distro.name(pretty=True)}
         dist_info.update(distro.info())
         dist_info['release_info'] = distro.distro_release_info()
+        dist_info['kernel_version'] = platform.release()
         self.inside_container = False
         self.moonraker_service_info: Dict[str, Any] = {}
         self.sudo_req_lock = asyncio.Lock()
@@ -197,20 +186,20 @@ class Machine:
         fpath = pathlib.Path(data_path).joinpath("moonraker.asvc")
         fm: FileManager = self.server.lookup_component("file_manager")
         fm.add_reserved_path("allowed_services", fpath, False)
+        default_svcs = source_info.read_asset("default_allowed_services") or ""
         try:
             if not fpath.exists():
-                fpath.write_text("\n".join(DEFAULT_ALLOWED_SERVICES))
+                fpath.write_text(default_svcs)
             data = fpath.read_text()
         except Exception:
-            logging.exception("Failed to read allowed_services.txt")
-            self._allowed_services = DEFAULT_ALLOWED_SERVICES
-        else:
-            svcs = [svc.strip() for svc in data.split("\n") if svc.strip()]
-            for svc in svcs:
-                if svc.endswith(".service"):
-                    svc = svc.rsplit(".", 1)[0]
-                if svc not in self._allowed_services:
-                    self._allowed_services.append(svc)
+            logging.exception("Failed to read moonraker.asvc")
+            data = default_svcs
+        svcs = [svc.strip() for svc in data.split("\n") if svc.strip()]
+        for svc in svcs:
+            if svc.endswith(".service"):
+                svc = svc.rsplit(".", 1)[0]
+            if svc not in self._allowed_services:
+                self._allowed_services.append(svc)
 
     def _update_log_rollover(self, log: bool = False) -> None:
         sys_info_msg = "\nSystem Info:"
