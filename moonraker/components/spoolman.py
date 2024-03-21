@@ -8,7 +8,8 @@ from __future__ import annotations
 import asyncio
 from asyncio.log import logger
 import logging
-import os, sys
+import os
+import sys
 import re
 import contextlib
 import tornado.websocket as tornado_ws
@@ -36,7 +37,9 @@ if TYPE_CHECKING:
 
 DB_NAMESPACE = "moonraker"
 ACTIVE_SPOOL_KEY = "spoolman.spool_id"
-CONSOLE_TAB="   " # Special space characters used as they will be displayed in gcode console
+# Special space characters used as they will be displayed in gcode console
+CONSOLE_TAB = "   "
+
 
 class SpoolManager:
     def __init__(self, config: ConfigHelper):
@@ -53,8 +56,10 @@ class SpoolManager:
 
         self.eventloop = self.server.get_event_loop()
         self._get_spoolman_urls(config)
-        self.sync_rate_seconds = config.getint("sync_rate", default=5, minval=1)
-        self.report_timer = self.eventloop.register_timer(self.report_extrusion)
+        self.sync_rate_seconds = config.getint(
+            "sync_rate", default=5, minval=1)
+        self.report_timer = self.eventloop.register_timer(
+            self.report_extrusion)
         self.pending_reports: Dict[int, float] = {}
         self.spoolman_ws: Optional[WebSocketClientConnection] = None
         self.connection_task: Optional[asyncio.Task] = None
@@ -68,15 +73,19 @@ class SpoolManager:
         self._highest_epos: float = 0
         self._current_extruder: str = "extruder"
         self.klippy_apis: APIComp = self.server.lookup_component("klippy_apis")
-        self.http_client: HttpClient = self.server.lookup_component("http_client")
-        self.database: MoonrakerDatabase = self.server.lookup_component("database")
-        announcements: Announcements = self.server.lookup_component("announcements")
+        self.http_client: HttpClient = self.server.lookup_component(
+            "http_client")
+        self.database: MoonrakerDatabase = self.server.lookup_component(
+            "database")
+        announcements: Announcements = self.server.lookup_component(
+            "announcements")
         announcements.register_feed("spoolman")
         self._register_notifications()
         self._register_listeners()
         self._register_endpoints()
         # Uboe ########################### Start
-        self.filament_slots = config.getint("filament_slots", default=1, minval=1)
+        self.filament_slots = config.getint(
+            "filament_slots", default=1, minval=1)
         self.slot_occupation = {}
         if self.filament_slots < 1 :
             logging.critical(f"Number of filament slots is less than 1. Please check the spoolman or moonraker [spoolman] setup.")
@@ -109,7 +118,8 @@ class SpoolManager:
 
     def _get_spoolman_urls(self, config: ConfigHelper) -> None:
         orig_url = config.get('server')
-        url_match = re.match(r"(?i:(?P<scheme>https?)://)?(?P<host>.+)", orig_url)
+        url_match = re.match(
+            r"(?i:(?P<scheme>https?)://)?(?P<host>.+)", orig_url)
         if url_match is None:
             raise config.error(
                 f"Section [spoolman], Option server: {orig_url}: Invalid URL format"
@@ -158,7 +168,8 @@ class SpoolManager:
         self.spool_id = await self.database.get_item(
             DB_NAMESPACE, ACTIVE_SPOOL_KEY, None
         )
-        self.connection_task = self.eventloop.create_task(self._connect_websocket())
+        self.connection_task = self.eventloop.create_task(
+            self._connect_websocket())
 
     async def _connect_websocket(self) -> None:
         log_connect: bool = True
@@ -258,14 +269,17 @@ class SpoolManager:
                 connect_timeout=1., request_timeout=2.
             )
             if response.status_code == 404:
-                logging.info(f"Spool ID {self.spool_id} not found, setting to None")
+                logging.info(
+                    f"Spool ID {self.spool_id} not found, setting to None")
                 self.pending_reports.pop(self.spool_id, None)
                 self.set_active_spool(None)
             elif response.has_error():
                 err_msg = self._get_response_error(response)
-                logging.info(f"Attempt to check spool status failed: {err_msg}")
+                logging.info(
+                    f"Attempt to check spool status failed: {err_msg}")
             else:
-                logging.info(f"Found Spool ID {self.spool_id} on spoolman instance")
+                logging.info(
+                    f"Found Spool ID {self.spool_id} on spoolman instance")
         self.spool_check_task = None
 
     def connected(self) -> bool:
@@ -278,7 +292,8 @@ class SpoolManager:
         await self.get_spools_for_machine(silent=False)
         result: Dict[str, Dict[str, Any]]
         result = await self.klippy_apis.subscribe_objects(
-            {"toolhead": ["position", "extruder"]}, self._handle_status_update, {}
+            {"toolhead": ["position", "extruder"]
+             }, self._handle_status_update, {}
         )
         toolhead = result.get("toolhead", {})
         self._current_extruder = toolhead.get("extruder", "extruder")
@@ -301,7 +316,8 @@ class SpoolManager:
         toolhead: Optional[Dict[str, Any]] = status.get("toolhead")
         if toolhead is None:
             return
-        epos: float = toolhead.get("position", [0, 0, 0, self._highest_epos])[3]
+        epos: float = toolhead.get(
+            "position", [0, 0, 0, self._highest_epos])[3]
         extr = toolhead.get("extruder", self._current_extruder)
         if extr != self._current_extruder:
             self._highest_epos = epos
@@ -337,9 +353,10 @@ class SpoolManager:
             logging.error(f"Slot number not provided")
             return
 
-        for spool in self.slot_occupation :
-            logging.info(f"found spool: {spool['filament']['name']} at slot {spool['location'].split(':')[1]}")
-            if int(spool['location'].split(':')[1]) == slot :
+        for spool in self.slot_occupation:
+            logging.info(
+                f"found spool: {spool['filament']['name']} at slot {spool['location'].split(':')[1]}")
+            if int(spool['location'].split(':')[1]) == slot:
                 self.set_active_spool(spool['id'])
                 return
 
@@ -368,7 +385,8 @@ class SpoolManager:
                     # added while waiting for the request
                     self.pending_reports.pop(spool_id, None)
                     if spool_id == self.spool_id:
-                        logging.info(f"Spool ID {spool_id} not found, setting to None")
+                        logging.info(
+                            f"Spool ID {spool_id} not found, setting to None")
                         self.set_active_spool(None)
                 else:
                     if not self._error_logged:
@@ -499,21 +517,21 @@ class SpoolManager:
 
         return spool_info
 
-    async def get_spool_info(self, id : int=None):
+    async def get_spool_info(self, sid: int = None):
         '''
         Gets info for active spool id and sends it to the klipper console
         '''
-        if not id :
-            logging.info(f"Fetching active spool")
+        if not sid:
+            logging.info("Fetching active spool")
             spool_id = await self._get_active_spool()
         else:
-            logging.info(f"Using spool id: {id}")
-            spool_id = id
+            logging.info("Setting spool id: %s", sid)
+            spool_id = sid
         self.server.send_event(
             "spoolman:get_spool_info", {"id": spool_id}
         )
-        if not spool_id :
-            msg = f"No active spool set"
+        if not spool_id:
+            msg = "No active spool set"
             await self._log_n_send(msg)
             return False
 
@@ -535,10 +553,10 @@ class SpoolManager:
                 msg = "{}- slot: {}".format(CONSOLE_TAB, int(spool_info['location'].split(self.printer_info["hostname"]+':')[1])) # Special space characters used as they will be displayed in gcode console
                 await self._log_n_send(msg)
                 found = True
-        if not found :
+        if not found:
             msg = f"Spool id {spool_id} is not assigned to this machine"
             await self._log_n_send(msg)
-            msg = f"Run : "
+            msg = "Run : "
             await self._log_n_send(msg)
             msg = f"{CONSOLE_TAB}SET_SPOOL_SLOT ID={spool_id} SLOT=integer" # Special space characters used as they will be displayed in gcode console
             await self._log_n_send(msg)
@@ -550,38 +568,43 @@ class SpoolManager:
         )
         return spool_id
 
-    async def verify_consistency(self, metadata, spools):
+    async def verify_consistency(self, metadata, spools) -> List[str, list]:
         '''
         Verifies that the filament type, name, color and amount are consistent with the spoolman db
         parameters:
             @param metadata: metadata extracted from the gcode file
             @param spools: list of spools assigned to the current machine retrieved from spoolman db
+        return :
+            @return: a list containing the severity of the mismatch and a swap table to replace tool ids in gcode
         '''
         # location field in spoolman db is the <hostname of the machine>:<tool_id>
         # tool_id is 0 for single extruder machines
         # build a list of all the tools assigned to the current machine
         sm_tools = {}
-        for spool in spools :
+        for spool in spools:
             tool_id = spool["location"].split(":")[1]
             sm_tools[int(tool_id)] = spool
 
-        mdata_filaments = metadata["filament_name"].replace("\"", "").replace("\n", "").split(";")
-        mdata_filament_usage = metadata["filament_used"].replace("\"", "").replace("\n", "").split(",")
+        mdata_filaments = metadata["filament_name"].replace(
+            "\"", "").replace("\n", "").split(";")
+        mdata_filament_usage = metadata["filament_used"].replace(
+            "\"", "").replace("\n", "").split(",")
 
         # build the equivalent list for the gcode metadata
         metadata_tools = {}
-        for id, filament in enumerate(mdata_filaments):
-            fil_usage = float(mdata_filament_usage[id]) if len(mdata_filament_usage) > id else 0
-            if not filament == 'EMPTY' :
-                metadata_tools[id] = {'name' : filament, 'usage' : fil_usage}
-            elif filament == 'EMPTY' and not (fil_usage == 0) :
-                msg = f"Filament usage for tool {id} is not 0 but filament is EMPTY placeholder. Please check your slicer setup and regenerate the gcode file."
+        for i, filament in enumerate(mdata_filaments):
+            fil_usage = float(mdata_filament_usage[i]) if len(
+                mdata_filament_usage) > i else 0
+            if not filament == 'EMPTY':
+                metadata_tools[i] = {'name': filament, 'usage': fil_usage}
+            elif filament == 'EMPTY' and not (fil_usage == 0):
+                msg = f"Filament usage for tool {i} is not 0 but filament is EMPTY placeholder. Please check your slicer setup and regenerate the gcode file."
                 await self._log_n_send(msg)
-                return False
-            elif filament == 'EMPTY' and (fil_usage == 0) :
+                return "critical", []
+            elif filament == 'EMPTY' and (fil_usage == 0):
                 # seems coherent
                 pass
-            else :
+            else:
                 # everything is fine
                 pass
 
@@ -594,45 +617,67 @@ class SpoolManager:
             await self._log_n_send(msg)
 
         # check filaments names for each tool
+        swap_table = [None for __ in range(self.filament_slots)]
         for tool_id, filament in metadata_tools.items():
             # if tool_id from slicer is not in spoolman db
-            if tool_id not in sm_tools :
+            if tool_id not in sm_tools:
                 msg = f"Tool id {tool_id} of machine {self.printer_info['hostname']} not assigned to a spool in spoolman db"
                 mismatch = "warning"
                 await self._log_n_send(msg)
-            else :
+            else:
                 # if filament name from slicer is not the same as the one in spoolman db
                 if sm_tools[tool_id]['filament']['name'] != filament['name']:
                     # if this spool is used for this print then there is a mismatch (else it's ok, but message is sent anyway)
                     await self._log_n_send(f"Filament mismatch spoolman vs slicer @id {tool_id}")
                     await self._log_n_send(f"{CONSOLE_TAB}- {sm_tools[tool_id]['filament']['name']} != {filament['name']}")
-                    if filament['usage'] > 0 :
+                    if filament['usage'] > 0:
+                        # if this filament can be found on another slot, raise a warning and save the new slot number to replace in gcode later
                         mismatch = "critical"
-                    else :
+                        for spool in spools:
+                            if spool['filament']['name'] == filament['name']:
+                                msg = f"Filament {filament['name']} is found in another slot: {spool['location'].split(':')[1]}"
+                                mismatch = "warning"
+                                swap_table[tool_id] = int(
+                                    spool['location'].split(':')[1])
+                                await self._log_n_send(msg)
+                    else:
                         await self._log_n_send(f"{CONSOLE_TAB}  * This filament is not used during this print (not pausing the printer)")
 
-        if mismatch: return mismatch
+        # verify swap table is consistent (not more than one index pointing to same value)
+        for i in range(len(swap_table)):
+            if swap_table.count(swap_table[i]) > 1:
+                msg = f"Swap table is not consistent: {swap_table}, more than one slot has been swapped to same slot."
+                mismatch = "critical"
+                await self._log_n_send(msg)
+
+        if mismatch == "critical":
+            return mismatch, swap_table
 
         # check that the amount of filament left in the spool is sufficient
         # get the amount of filament needed for each tool
         for tool_id, filament in metadata_tools.items():
-            if filament['usage'] > sm_tools[tool_id]['remaining_weight']:
-                msg = f"WARNING : Filament amount insufficient for spool {filament['name']}: {sm_tools[tool_id]['remaining_weight']*100/100} < {filament['usage']*100/100}"
+            # if the tool has been swapped, use the new tool id
+            if swap_table[tool_id]:
+                _tool_id = int(swap_table[tool_id])
+            # else use the original tool id and verify that the amount of filament left is sufficient
+            if filament['usage'] > sm_tools[_tool_id]['remaining_weight']:
+                msg = f"WARNING : Filament amount insufficient for spool {filament['name']}: {sm_tools[_tool_id]['remaining_weight']*100/100} < {filament['usage']*100/100}"
                 mismatch = "critical"
                 await self._log_n_send(msg)
                 msg = f"Expect filament runout for machine {self.printer_info['hostname']}, or setup the mmu in order to avoid this."
                 await self._log_n_send(msg)
-        if mismatch: return mismatch
+        if mismatch == "critical":
+            return mismatch, swap_table
 
         # Check that the active spool matches the spool from metadata when in single extruder mode
-        if len(metadata_tools) == 1 :
-            if self.spool_id != sm_tools[0]['id'] :
+        if len(metadata_tools) == 1:
+            if self.spool_id != sm_tools[0]['id']:
                 msg = f"Active spool mismatch: {self.spool_id} != {sm_tools[0]['id']}"
                 mismatch = "critical"
                 await self._log_n_send(msg)
                 return mismatch
 
-        return True
+        return mismatch, swap_table
 
     async def get_spools_for_machine(self, silent=False) -> List[Dict[str, Any]]:
         '''
@@ -642,47 +687,52 @@ class SpoolManager:
         machine_hostname = self.printer_info["hostname"]
         logging.info(f"Getting spools for machine: {machine_hostname}")
 
-        args ={
-            "request_method" : "GET",
-            "path" : f"/v1/spool",
-            "query" : f"location={machine_hostname}",
+        args = {
+            "request_method": "GET",
+            "path": f"/v1/spool",
+            "query": f"location={machine_hostname}",
 
         }
         webrequest = WebRequest(
-            endpoint = f"{self.spoolman_url}/spools",
+            endpoint=f"{self.spoolman_url}/spools",
             args=args,
             request_type=RequestType.GET,
         )
-        try :
+        try:
             spools = await self._proxy_spoolman_request(webrequest)
         except Exception as e:
-            if not silent : await self._log_n_send(f"Failed to retrieve spools from spoolman: {e}")
+            if not silent :
+                await self._log_n_send(f"Failed to retrieve spools from spoolman: {e}")
             return []
         if self.filament_slots < len(spools) :
-            if not silent : await self._log_n_send(f"Number of spools assigned to machine {machine_hostname} is greater than the number of slots available on the machine. Please check the spoolman or moonraker [spoolman] setup.")
+            if not silent :
+                await self._log_n_send(f"Number of spools assigned to machine {machine_hostname} is greater than the number of slots available on the machine. Please check the spoolman or moonraker [spoolman] setup.")
             return []
         if spools:
-            if not silent : await self._log_n_send(f"Spools for machine:")
+            if not silent:
+                await self._log_n_send("Spools for machine:")
             # create a table of size len(spools)
             table = [None for __ in range(self.filament_slots)]
             for spool in spools:
                 slot = spool['location'].split(machine_hostname+':')[1]
                 if not slot :
-                    if not silent : await self._log_n_send(f"location field for {spool['filament']['name']} @ {spool['id']} in spoolman db is not formatted correctly. Please check the spoolman setup.")
+                    if not silent :
+                        await self._log_n_send(f"location field for {spool['filament']['name']} @ {spool['id']} in spoolman db is not formatted correctly. Please check the spoolman setup.")
                 else :
                     table[int(slot)] = spool
-            if not silent :
-                for i, spool in enumerate(table) :
-                    if spool :
+            if not silent:
+                for i, spool in enumerate(table):
+                    if spool:
                         await self._log_n_send(f"{CONSOLE_TAB}{i} : {spool['filament']['name']}")
-                    else :
+                    else:
                         await self._log_n_send(f"{CONSOLE_TAB}{i} : empty")
         else :
-            if not silent : await self._log_n_send(f"No spools assigned to machine: {machine_hostname}")
-            return []
+            if not silent :
+                await self._log_n_send(f"No spools assigned to machine: {machine_hostname}")
+            return False
         self.slot_occupation = spools
 
-    async def unset_spool_slot(self, spool_id : int) -> bool:
+    async def unset_spool_slot(self, spool_id: int) -> bool:
         '''
         Removes the machine:slot allocation in spoolman db for spool_id
 
@@ -691,32 +741,34 @@ class SpoolManager:
         returns:
             @return: True if successful, False otherwise
         '''
-        if spool_id == None :
+        if spool_id == None:
             await self._log_n_send(f"Trying to unset spool but no spool id provided.")
             return False
 
-        #use the PATCH method on the spoolman api
-        #get current printer hostname
+        # use the PATCH method on the spoolman api
+        # get current printer hostname
         machine_hostname = self.printer_info["hostname"]
-        logging.info(f"Unsetting spool {spool_id} for machine: {machine_hostname}")
+        logging.info(
+            f"Unsetting spool {spool_id} for machine: {machine_hostname}")
         # get spool info from spoolman
         body = {
-            "location"         : "",
+            "location": "",
         }
-        args ={
-            "request_method" : "PATCH",
-            "path" : f"/v1/spool/{spool_id}",
-            "body" : body,
+        args = {
+            "request_method": "PATCH",
+            "path": f"/v1/spool/{spool_id}",
+            "body": body,
         }
         webrequest = WebRequest(
-            endpoint = f"{self.spoolman_url}/spools/{spool_id}",
+            endpoint=f"{self.spoolman_url}/spools/{spool_id}",
             args=args,
             request_type=RequestType.POST,
         )
-        try :
+        try:
             await self._proxy_spoolman_request(webrequest)
         except Exception as e:
-            logging.error(f"Failed to unset spool {spool_id} for machine {machine_hostname}: {e}")
+            logging.error(
+                f"Failed to unset spool {spool_id} for machine {machine_hostname}: {e}")
             await self._log_n_send(f"Failed to unset spool {spool_id} for machine {machine_hostname}")
             return False
         await self.get_spools_for_machine(silent=True)
@@ -733,23 +785,24 @@ class SpoolManager:
             @return: True if successful, False otherwise
         '''
         await self.get_spools_for_machine(silent=True)
-        if spool_id == None :
+        if spool_id == None:
             msg = f"Trying to set spool but no spool id provided."
             await self._log_n_send(msg)
             return False
 
-        logging.info(f"Setting spool {spool_id} for machine: {self.printer_info['hostname']} @ slot {slot}")
+        logging.info(
+            f"Setting spool {spool_id} for machine: {self.printer_info['hostname']} @ slot {slot}")
         self.server.send_event(
             "spoolman:spoolman_set_spool_slot", {"id": spool_id, "slot": slot}
         )
         # check that slot not higher than number of slots available
-        if (slot == None) and (self.filament_slots > 1) :
+        if (slot == None) and (self.filament_slots > 1):
             msg = f"Trying to set spool {spool_id} for machine {self.printer_info['hostname']} but no slot number provided."
             await self._log_n_send(msg)
             return False
-        elif not slot and (self.filament_slots == 1) :
+        elif not slot and (self.filament_slots == 1):
             slot = 0
-        elif slot > self.filament_slots-1 :
+        elif slot > self.filament_slots-1:
             msg = f"Trying to set spool {spool_id} for machine {self.printer_info['hostname']} @ slot {slot} but only {self.filament_slots} slots are available. Please check the spoolman or moonraker [spoolman] setup."
             await self._log_n_send(msg)
             return False
@@ -757,62 +810,64 @@ class SpoolManager:
         # first check if the spool is not already assigned to a machine
         spool_info = await self.get_info_for_spool(spool_id)
         if 'location' in spool_info:
-            if spool_info['location'] :
+            if spool_info['location']:
                 # if the spool is already assigned to current machine
-                if spool_info['location'].split(':')[0] == self.printer_info["hostname"] :
+                if spool_info['location'].split(':')[0] == self.printer_info["hostname"]:
                     await self._log_n_send(f"Spool {spool_info['filament']['name']} (id: {spool_id}) is already assigned to this machine @ slot {spool_info['location'].split(':')[1]}")
-                    if int(spool_info['location'].split(':')[1]) == slot :
+                    if int(spool_info['location'].split(':')[1]) == slot:
                         await self._log_n_send(f"Updating slot for spool {spool_info['filament']['name']} (id: {spool_id}) to {slot}")
                 # if the spool is already assigned to another machine
-                else :
+                else:
                     await self._log_n_send(f"Spool {spool_info['filament']['name']} (id: {spool_id}) is already assigned to another machine: {spool_info['location']}")
                     return False
 
         # then check that no spool is already assigned to the slot of this machine
         if self.slot_occupation not in [False, None]:
-            for spool in self.slot_occupation :
+            for spool in self.slot_occupation:
                 logging.info(f"found spool: {spool['filament']['name']} ")
-                if int(spool['location'].split(':')[1]) == slot :
+                if int(spool['location'].split(':')[1]) == slot:
                     await self._log_n_send(f"Slot {slot} is already assigned to spool {spool['filament']['name']} (id: {spool['id']})")
                     await self._log_n_send(f"{CONSOLE_TAB}- Overwriting slot assignment")
-                    if not await self.unset_spool_slot(spool['id']) :
+                    if not await self.unset_spool_slot(spool['id']):
                         await self._log_n_send(f"{CONSOLE_TAB*2}Failed to unset spool {spool['filament']['name']} (id: {spool['id']}) from slot {slot}")
                         return False
                     await self._log_n_send(f"{CONSOLE_TAB*2}Spool {spool['filament']['name']} (id: {spool['id']}) unset from slot {slot}")
 
         # Check if spool is not allready archived
-        if spool_info['archived'] :
+        if spool_info['archived']:
             msg = f"Spool {spool_id} is archived. Please check the spoolman setup."
             await self._log_n_send(msg)
             return False
 
-        #use the PATCH method on the spoolman api
-        #get current printer hostname
+        # use the PATCH method on the spoolman api
+        # get current printer hostname
         machine_hostname = self.printer_info["hostname"]
-        logging.info(f"Setting spool {spool_info['filament']['name']} (id: {spool_info['id']}) for machine: {machine_hostname} @ slot {slot}")
+        logging.info(
+            f"Setting spool {spool_info['filament']['name']} (id: {spool_info['id']}) for machine: {machine_hostname} @ slot {slot}")
         # get spool info from spoolman
         body = {
-            "location"         : f"{machine_hostname}:{slot}",
+            "location": f"{machine_hostname}:{slot}",
         }
-        args ={
-            "request_method" : "PATCH",
-            "path" : f"/v1/spool/{spool_id}",
-            "body" : body,
+        args = {
+            "request_method": "PATCH",
+            "path": f"/v1/spool/{spool_id}",
+            "body": body,
         }
         webrequest = WebRequest(
-            endpoint = f"{self.spoolman_url}/spools/{spool_id}",
+            endpoint=f"{self.spoolman_url}/spools/{spool_id}",
             args=args,
             request_type=RequestType.POST,
         )
-        try :
+        try:
             await self._proxy_spoolman_request(webrequest)
         except Exception as e:
-            logging.error(f"Failed to set spool {spool_id} for machine {machine_hostname} @ slot {slot}: {e}")
+            logging.error(
+                f"Failed to set spool {spool_id} for machine {machine_hostname} @ slot {slot}: {e}")
             await self._log_n_send(f"Failed to set spool {spool_id} for machine {machine_hostname}")
             return False
         await self._log_n_send(f"Spool {spool_id} set for machine {machine_hostname} @ slot {slot}")
         await self.get_spools_for_machine(silent=True)
-        if slot == 0 and (self.filament_slots == 1) :
+        if slot == 0 and (self.filament_slots == 1):
             await self.set_active_slot(slot)
             await self._log_n_send(f"{CONSOLE_TAB*2}Setting slot 0 as active (single slot machine)")
         return True
@@ -821,43 +876,46 @@ class SpoolManager:
         '''
         Clears all slots for the current machine
         '''
-        logging.info(f"Clearing spool slots for machine: {self.printer_info['hostname']}")
+        logging.info(
+            f"Clearing spool slots for machine: {self.printer_info['hostname']}")
         self.server.send_event(
             "spoolman:clear_spool_slots", {}
         )
         # get spools assigned to current machine
         spools = self.slot_occupation
         if spools not in [False, None]:
-            for spool in spools :
-                #use the PATCH method on the spoolman api
-                #get current printer hostname
+            for spool in spools:
+                # use the PATCH method on the spoolman api
+                # get current printer hostname
                 machine_hostname = self.printer_info["hostname"]
-                logging.info(f"Clearing spool {spool['id']} for machine: {machine_hostname}")
+                logging.info(
+                    f"Clearing spool {spool['id']} for machine: {machine_hostname}")
                 # get spool info from spoolman
                 __ = await self.get_info_for_spool(spool['id'])
                 body = {
-                    "location"         : "",
+                    "location": "",
                 }
-                args ={
-                    "request_method" : "PATCH",
-                    "path" : f"/v1/spool/{spool['id']}",
-                    "body" : body,
+                args = {
+                    "request_method": "PATCH",
+                    "path": f"/v1/spool/{spool['id']}",
+                    "body": body,
                 }
                 webrequest = WebRequest(
-                    endpoint = f"{self.spoolman_url}/spools/{spool['id']}",
+                    endpoint=f"{self.spoolman_url}/spools/{spool['id']}",
                     args=args,
                     request_type=RequestType.POST,
                 )
-                try :
+                try:
                     await self._proxy_spoolman_request(webrequest)
                 except Exception as e:
-                    logging.error(f"Failed to clear spool {spool['id']} for machine {machine_hostname}: {e}")
+                    logging.error(
+                        f"Failed to clear spool {spool['id']} for machine {machine_hostname}: {e}")
                     await self._log_n_send(f"Failed to clear spool {spool['id']} for machine {machine_hostname}")
                     return False
                 await self._log_n_send(f"Spool {spool['id']} cleared for machine {machine_hostname}")
                 await self.get_spools_for_machine(silent=True)
             return True
-        else :
+        else:
             msg = f"No spools for machine {self.printer_info['hostname']}"
             await self._log_n_send(msg)
             return False
@@ -867,45 +925,52 @@ class SpoolManager:
         Uses metadata from the gcode to identify the filaments and runs some verifications
         based on the filament type and the amount of filament left in spoolman db.
         '''
-        logging.info(f"Checking filaments")
-        await self._log_n_send(f"Checking filament consistency: ")
+        logging.info("Checking filaments")
+        await self._log_n_send("Checking filament consistency: ")
         try:
             print_stats = await self.klippy_apis.query_objects({"print_stats": None})
-        except Exception:
+        except asyncio.TimeoutError:
             # Klippy not connected
-            logging.error(f"Could not retrieve print_stats through klippy API")
+            logging.error("Could not retrieve print_stats through klippy API")
             self.server.send_event(
-                "spoolman:check_failure", {"message" : f"Could not retrieve print_stats through klippy API"}
+                "spoolman:check_failure", {
+                    "message": "Could not retrieve print_stats through klippy API"}
             )
             return False
-        filename = os.path.join('/home', 'uboe', 'printer_data', 'gcodes', print_stats["print_stats"]["filename"])
+        # TODO: file path has to be better implemented like fetching it via klippy api ?
+        filename = os.path.join('/home', os.getenv('USER'), 'printer_data',
+                                'gcodes', print_stats["print_stats"]["filename"])
         state = print_stats["print_stats"]["state"]
 
-        if state not in ['printing', 'paused'] :
+        if state not in ['printing', 'paused']:
             # No print active
             msg = f"No print active, cannot get gcode from file (state: {state})"
             await self._log_n_send(msg)
             self.server.send_event(
-                "spoolman:check_failure", {"message" : msg}
+                "spoolman:check_failure", {"message": msg}
             )
-            if not debug: return False
+            if not debug:
+                return False
 
         # Get gcode from file
         if filename is None:
-            logging.error(f"Filename is None")
+            logging.error("Filename is None")
             self.server.send_event(
-                "spoolman:check_failure", {"message" : "Filename is None"}
+                "spoolman:check_failure", {"message": "Filename is None"}
             )
-            if not debug: return False
+            if not debug:
+                return False
 
         metadata: Dict[str, Any] = {}
         if not filename:
-            logging.info(f"No filemame retrieved: {filename}")
-            if not debug: sys.exit(-1)
+            logging.info("No filemame retrieved: {filename}")
+            if not debug:
+                sys.exit(-1)
         try:
             metadata = extract_metadata(filename, False)
-        except Exception:
-            if not debug: raise Exception(f"Failed to extract metadata from {filename}")
+        except TimeoutError as e:
+            if not debug:
+                raise TimeoutError(f"Failed to extract metadata from {filename}") from e
 
         # check that active spool is in machine's slots
         active_spool_id = await self._get_active_spool()
@@ -913,57 +978,80 @@ class SpoolManager:
             msg = f"No active spool set"
             await self._log_n_send(msg)
             self.server.send_event(
-                "spoolman:check_failure", {"message" : msg}
+                "spoolman:check_failure", {"message": msg}
             )
-            if not debug: return False
+            if not debug:
+                return False
 
         if self.slot_occupation == False:
-            msg = f"Failed to retrieve spools from spoolman"
+            msg = "Failed to retrieve spools from spoolman"
             self.server.send_event(
-                "spoolman:check_failure", {"message" : msg}
+                "spoolman:check_failure", {"message": msg}
             )
-            if not debug: return False
+            if not debug:
+                return False
         found = False
-        for spool in self.slot_occupation :
-            if int(spool['id']) == active_spool_id :
+        for spool in self.slot_occupation:
+            if int(spool['id']) == active_spool_id:
                 found = True
-        if not found :
+        if not found:
             await self._log_n_send(f"Active spool {active_spool_id} is not assigned to this machine")
-            await self._log_n_send(f"Run : ")
+            await self._log_n_send("Run : ")
             await self._log_n_send(f"{CONSOLE_TAB}SET_SPOOL_SLOT ID={active_spool_id} SLOT=integer")
-            if not debug: return False
+            if not debug:
+                return False
 
         if not self.slot_occupation:
             msg = f"No spools assigned to machine {self.printer_info['hostname']}"
             self.server.send_event(
-                "spoolman:check_failure", {"message" : msg}
+                "spoolman:check_failure", {"message": msg}
             )
-            if not debug: return False
+            if not debug:
+                return False
 
-        ret = await self.verify_consistency(metadata, self.slot_occupation)
-        if ret :
-            msg = f"Slicer setup and spoolman db are consistent"
+        mismatch, swap_table = await self.verify_consistency(metadata, self.slot_occupation)
+        if mismatch != "critical":
+            msg = "Slicer setup and spoolman db are consistent"
             await self._log_n_send(msg)
-            if not debug: return True
-        else :
-            if ret == "critical":
-                msg1 = f"FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED! PAUSING PRINT."
+            if not debug:
+                return True
+        else:
+            if mismatch == "critical":
+                msg1 = "FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED! PAUSING PRINT."
                 await self._log_n_send(msg1)
-                msg2 = f"Please check the spoolman setup and physical spools to match the slicer setup."
+                msg2 = "Please check the spoolman setup and physical spools to match the slicer setup."
                 await self._log_n_send(msg2)
-                #if printer is runnning, pause it
+                # if printer is runnning, pause it
                 self.server.send_event(
-                    "spoolman:check_failure", {"message" : msg1+msg2}
+                    "spoolman:check_failure", {"message": msg1+msg2}
                 )
                 await self.klippy_apis.run_gcode("M300 P2000 S4000")
                 if not self.klippy_apis.query_objects({"pause_resume": None}['is_paused']) :
                     await self.klippy_apis.pause_print()
-                if not debug: return False
-            else :
-                msg1 = f"FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED!"
+                if not debug:
+                    return False
+            else:
+                msg1 = "FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED!"
                 await self._log_n_send(msg1)
-                msg2 = f"Minor mismatches have been found, proceeding to print."
+                msg2 = "Minor mismatches have been found, proceeding to print."
                 await self._log_n_send(msg2)
+
+        # if swap table is not empty, prompt user for automatic tools swap
+        if swap_table:
+            msg = f"Swap table: {swap_table}"
+            await self._log_n_send(msg)
+            msg = "Proceeding to automatic tools swap"
+            await self._log_n_send(msg)
+            self._swap_tools_in_gcode(swap_table)
+
+        if not debug:
+            return True
+
+    async def _swap_tools_in_gcode(self, swap_table):
+        '''
+        Swaps the tools in the gcode file according to the swap_table
+        '''
+        pass
 
     async def __spool_info_notificator(self, web_request: WebRequest):
         '''
@@ -971,6 +1059,7 @@ class SpoolManager:
         '''
         spool_id = await self._get_active_spool()
         return await self.get_info_for_spool(spool_id)
+
 
 def load_component(config: ConfigHelper) -> SpoolManager:
     return SpoolManager(config)
