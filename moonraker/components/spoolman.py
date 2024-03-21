@@ -524,15 +524,15 @@ class SpoolManager:
             return False
         msg = f"Active spool is: {spool_info['filament']['name']} (id : {spool_info['id']})"
         await self._log_n_send(msg)
-        msg = f"{CONSOLE_TAB}- used: {int(spool_info['used_weight'])} g" # Special space characters used as they will be siplayed in gcode console
+        msg = f"{CONSOLE_TAB}- used: {int(spool_info['used_weight'])} g" # Special space characters used as they will be displayed in gcode console
         await self._log_n_send(msg)
-        msg = f"{CONSOLE_TAB}- remaining: {int(spool_info['remaining_weight'])} g" # Special space characters used as they will be siplayed in gcode console
+        msg = f"{CONSOLE_TAB}- remaining: {int(spool_info['remaining_weight'])} g" # Special space characters used as they will be displayed in gcode console
         await self._log_n_send(msg)
         # if spool_id not in filament_slots :
         found = False
         for spoolid in self.slot_occupation:
             if int(spoolid['id']) == spool_id :
-                msg = "{}- slot: {}".format(CONSOLE_TAB, int(spool_info['location'].split(self.printer_info["hostname"]+':')[1])) # Special space characters used as they will be siplayed in gcode console
+                msg = "{}- slot: {}".format(CONSOLE_TAB, int(spool_info['location'].split(self.printer_info["hostname"]+':')[1])) # Special space characters used as they will be displayed in gcode console
                 await self._log_n_send(msg)
                 found = True
         if not found :
@@ -540,7 +540,7 @@ class SpoolManager:
             await self._log_n_send(msg)
             msg = f"Run : "
             await self._log_n_send(msg)
-            msg = f"{CONSOLE_TAB}SET_SPOOL_SLOT ID={spool_id} SLOT=integer" # Special space characters used as they will be siplayed in gcode console
+            msg = f"{CONSOLE_TAB}SET_SPOOL_SLOT ID={spool_id} SLOT=integer" # Special space characters used as they will be displayed in gcode console
             await self._log_n_send(msg)
             return False
 
