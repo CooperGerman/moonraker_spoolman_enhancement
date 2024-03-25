@@ -495,7 +495,7 @@ class SpoolManager:
     async def _log_n_send(self, msg):
         ''' logs and sends msg to the klipper console'''
         logging.error(msg)
-        await self.klippy_apis.run_gcode(f"M118 {msg}", None)
+        await self.klippy_apis.run_gcode(f"RESPOND PREFIX=\"\" MSG=\"{msg}\"", None)
 
     async def get_info_for_spool(self, spool_id : int):
         response = await self.http_client.request(
@@ -624,6 +624,16 @@ class SpoolManager:
                 msg = f"Tool id {tool_id} of machine {self.printer_info['hostname']} not assigned to a spool in spoolman db"
                 mismatch = "warning"
                 await self._log_n_send(msg)
+                if filament['usage'] > 0:
+                    # if this filament can be found on another slot, raise a warning and save the new slot number to replace in gcode later
+                    mismatch = "critical"
+                    for spool in spools:
+                        if spool['filament']['name'] == filament['name']:
+                            msg = f"Filament {filament['name']} is found in another slot: {spool['location'].split(':')[1]}"
+                            mismatch = "warning"
+                            swap_table[tool_id] = int(
+                                spool['location'].split(':')[1])
+                            await self._log_n_send(msg)
             else:
                 # if filament name from slicer is not the same as the one in spoolman db
                 if sm_tools[tool_id]['filament']['name'] != filament['name']:
@@ -645,7 +655,7 @@ class SpoolManager:
 
         # verify swap table is consistent (not more than one index pointing to same value)
         for i in range(len(swap_table)):
-            if swap_table.count(swap_table[i]) > 1:
+            if swap_table.count(swap_table[i]) > 1 and swap_table[i] != None:
                 msg = f"Swap table is not consistent: {swap_table}, more than one slot has been swapped to same slot."
                 mismatch = "critical"
                 await self._log_n_send(msg)
@@ -657,8 +667,9 @@ class SpoolManager:
         # get the amount of filament needed for each tool
         for tool_id, filament in metadata_tools.items():
             # if the tool has been swapped, use the new tool id
-            if swap_table[tool_id]:
-                _tool_id = int(swap_table[tool_id])
+            _tool_id = tool_id
+            if swap_table[int(tool_id)]:
+                _tool_id = swap_table[tool_id]
             # else use the original tool id and verify that the amount of filament left is sufficient
             if filament['usage'] > sm_tools[_tool_id]['remaining_weight']:
                 msg = f"WARNING : Filament amount insufficient for spool {filament['name']}: {sm_tools[_tool_id]['remaining_weight']*100/100} < {filament['usage']*100/100}"
@@ -670,7 +681,7 @@ class SpoolManager:
             return mismatch, swap_table
 
         # Check that the active spool matches the spool from metadata when in single extruder mode
-        if len(metadata_tools) == 1:
+        if self.filament_slots == 1 and len(sm_tools) == 1:
             if self.spool_id != sm_tools[0]['id']:
                 msg = f"Active spool mismatch: {self.spool_id} != {sm_tools[0]['id']}"
                 mismatch = "critical"
@@ -1013,8 +1024,6 @@ class SpoolManager:
         if mismatch != "critical":
             msg = "Slicer setup and spoolman db are consistent"
             await self._log_n_send(msg)
-            if not debug:
-                return True
         else:
             if mismatch == "critical":
                 msg1 = "FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED! PAUSING PRINT."
@@ -1026,7 +1035,7 @@ class SpoolManager:
                     "spoolman:check_failure", {"message": msg1+msg2}
                 )
                 await self.klippy_apis.run_gcode("M300 P2000 S4000")
-                if not self.klippy_apis.query_objects({"pause_resume": None}['is_paused']) :
+                if not await self.klippy_apis.query_objects({"pause_resume": None}['is_paused']) :
                     await self.klippy_apis.pause_print()
                 if not debug:
                     return False
@@ -1040,18 +1049,18 @@ class SpoolManager:
         if swap_table:
             msg = f"Swap table: {swap_table}"
             await self._log_n_send(msg)
-            msg = "Proceeding to automatic tools swap"
+            msg = "Dumping table to variables.cfg file in {}".format(os.path.join('/home', os.getenv('USER'), 'printer_data'))
             await self._log_n_send(msg)
-            self._swap_tools_in_gcode(swap_table)
+            await self._gen_swap_table_cfg(swap_table)
 
         if not debug:
             return True
 
-    async def _swap_tools_in_gcode(self, swap_table):
+    async def _gen_swap_table_cfg(self, swap_table):
         '''
-        Swaps the tools in the gcode file according to the swap_table
+        Generates a swap table file in the specified save_variables file
         '''
-        pass
+        await self.klippy_apis.run_gcode("SAVE_VARIABLE VARIABLE=swap_table VALUE=\"{}\"".format(swap_table))
 
     async def __spool_info_notificator(self, web_request: WebRequest):
         '''
