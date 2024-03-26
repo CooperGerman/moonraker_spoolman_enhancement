@@ -38,19 +38,19 @@ if TYPE_CHECKING:
 DB_NAMESPACE = "moonraker"
 ACTIVE_SPOOL_KEY = "spoolman.spool_id"
 # Special space characters used as they will be displayed in gcode console
-CONSOLE_TAB = "   "
+CONSOLE_TAB = "   " #!FIXME : should probably be done differently
 
 
 class SpoolManager:
     def __init__(self, config: ConfigHelper):
         '''
-        This class supercedes the SpoolManager class from moonraker/components/spoolman.py
-        It aims at providing the same functionality, with added capability.
-        Added capabilities are:
+        Capabilities are:
             - logging in the mainsail/fluidd console
             - Basic checks for filament presence
             - Basic check for filament type
             - Basic check for filament sufficience
+            - Spool swap table generation
+            - Spool swap table verification
         '''
         self.server = config.get_server()
 
@@ -286,7 +286,6 @@ class SpoolManager:
 
     async def _handle_klippy_ready(self) -> None:
         await self.get_spools_for_machine(silent=False)
-        await self.klippy_apis.run_gcode("SAVE_VARIABLE VARIABLE=mmu_slots VALUE=\"{}\"".format(self.slot_occupation))
         result: Dict[str, Dict[str, Any]]
         result = await self.klippy_apis.subscribe_objects(
             {"toolhead": ["position", "extruder"]
@@ -739,6 +738,7 @@ class SpoolManager:
                 await self._log_n_send(f"No spools assigned to machine: {machine_hostname}")
             return False
         self.slot_occupation = spools
+        await self.klippy_apis.run_gcode("SAVE_VARIABLE VARIABLE=mmu_slots VALUE=\"{}\"".format(self.slot_occupation))
 
     async def unset_spool_slot(self, spool_id: int) -> bool:
         '''
