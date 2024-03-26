@@ -83,7 +83,6 @@ class SpoolManager:
         self._register_notifications()
         self._register_listeners()
         self._register_endpoints()
-        # Uboe ########################### Start
         self.filament_slots = config.getint(
             "filament_slots", default=1, minval=1)
         self.slot_occupation = {}
@@ -91,11 +90,9 @@ class SpoolManager:
             logging.critical(f"Number of filament slots is less than 1. Please check the spoolman or moonraker [spoolman] setup.")
             return
         self.printer_info = self.server.get_host_info()
-        # ################################ End
         self.server.register_remote_method(
             "spoolman_set_active_spool", self.set_active_spool
         )
-        # Uboe ########################### Start
         self.server.register_remote_method(
             "spoolman_set_active_slot", self.set_active_slot
         )
@@ -114,7 +111,6 @@ class SpoolManager:
         self.server.register_remote_method(
             "spoolman_clear_spool_slots", self.clear_spool_slots
         )
-        # ################################ End
 
     def _get_spoolman_urls(self, config: ConfigHelper) -> None:
         orig_url = config.get('server')
