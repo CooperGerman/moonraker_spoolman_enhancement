@@ -495,7 +495,7 @@ class SpoolManager:
     async def _log_n_send(self, msg):
         ''' logs and sends msg to the klipper console'''
         logging.error(msg)
-        await self.klippy_apis.run_gcode(f"RESPOND PREFIX=\"\" MSG=\"{msg}\"", None)
+        await self.klippy_apis.run_gcode(f"M118 {msg}", None)
 
     async def get_info_for_spool(self, spool_id : int):
         response = await self.http_client.request(
@@ -671,7 +671,7 @@ class SpoolManager:
             if swap_table[int(tool_id)]:
                 _tool_id = swap_table[tool_id]
             # else use the original tool id and verify that the amount of filament left is sufficient
-            if filament['usage'] > sm_tools[_tool_id]['remaining_weight']:
+            if (_tool_id in sm_tools) and (filament['usage'] > sm_tools[_tool_id]['remaining_weight']):
                 msg = f"WARNING : Filament amount insufficient for spool {filament['name']}: {sm_tools[_tool_id]['remaining_weight']*100/100} < {filament['usage']*100/100}"
                 mismatch = "critical"
                 await self._log_n_send(msg)
@@ -1035,7 +1035,7 @@ class SpoolManager:
                     "spoolman:check_failure", {"message": msg1+msg2}
                 )
                 await self.klippy_apis.run_gcode("M300 P2000 S4000")
-                if not await self.klippy_apis.query_objects({"pause_resume": None}['is_paused']) :
+                if not await self.klippy_apis.query_objects({"pause_resume": None})['pause_resume']['is_paused'] :
                     await self.klippy_apis.pause_print()
                 if not debug:
                     return False
