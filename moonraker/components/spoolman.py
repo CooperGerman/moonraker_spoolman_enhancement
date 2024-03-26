@@ -290,6 +290,7 @@ class SpoolManager:
 
     async def _handle_klippy_ready(self) -> None:
         await self.get_spools_for_machine(silent=False)
+        await self.klippy_apis.run_gcode("SAVE_VARIABLE VARIABLE=mmu_slots VALUE=\"{}\"".format(self.slot_occupation))
         result: Dict[str, Dict[str, Any]]
         result = await self.klippy_apis.subscribe_objects(
             {"toolhead": ["position", "extruder"]
