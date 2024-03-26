@@ -488,6 +488,7 @@ class SpoolManager:
         except asyncio.TimeoutError:
             pass
 
+    #!FIXME : should probably be removed once debugging needs decrease
     async def _log_n_send(self, msg):
         ''' logs and sends msg to the klipper console'''
         logging.error(msg)
