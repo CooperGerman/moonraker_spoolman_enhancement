@@ -1050,6 +1050,8 @@ class SpoolManager:
             msg = "Dumping table to variables.cfg file in {}".format(os.path.join('/home', os.getenv('USER'), 'printer_data'))
             await self._log_n_send(msg)
             await self._gen_swap_table_cfg(swap_table)
+        else :
+            await self._gen_swap_table_cfg([None for __ in range(self.filament_slots)])
 
         if not debug:
             return True
