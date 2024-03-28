@@ -574,6 +574,7 @@ class SpoolManager:
         return :
             @return: a list containing the severity of the mismatch and a swap table to replace tool ids in gcode
         '''
+        mismatch = "warning"
         # location field in spoolman db is the <hostname of the machine>:<tool_id>
         # tool_id is 0 for single extruder machines
         # build a list of all the tools assigned to the current machine
@@ -595,9 +596,10 @@ class SpoolManager:
             if not filament == 'EMPTY':
                 metadata_tools[i] = {'name': filament, 'usage': fil_usage}
             elif filament == 'EMPTY' and not (fil_usage == 0):
+                mismatch = "critical"
                 msg = f"Filament usage for tool {i} is not 0 but filament is EMPTY placeholder. Please check your slicer setup and regenerate the gcode file."
-                await self._log_n_send(msg)
-                return "critical", []
+                await self._log_n_send((mismatch).upper()+': '+mismatch+': '+msg)
+                return mismatch, []
             elif filament == 'EMPTY' and (fil_usage == 0):
                 # seems coherent
                 pass
@@ -606,12 +608,11 @@ class SpoolManager:
                 pass
 
         # compare the two lists
-        mismatch = False
         # check list length
         if len(sm_tools) != len(metadata_tools):
             msg = f"Number of tools mismatch between spoolman slicer and klipper: {len(sm_tools)} != {len(metadata_tools)}"
             mismatch = "warning"
-            await self._log_n_send(msg)
+            await self._log_n_send((mismatch).upper()+': '+msg)
 
         # check filaments names for each tool
         swap_table = [None for __ in range(self.filament_slots)]
@@ -620,33 +621,32 @@ class SpoolManager:
             if tool_id not in sm_tools:
                 msg = f"Tool id {tool_id} of machine {self.printer_info['hostname']} not assigned to a spool in spoolman db"
                 mismatch = "warning"
-                await self._log_n_send(msg)
+                await self._log_n_send((mismatch).upper()+': '+msg)
                 if filament['usage'] > 0:
                     # if this filament can be found on another slot, raise a warning and save the new slot number to replace in gcode later
                     mismatch = "critical"
+                    msg = f"Filament {filament['name']} not found on any other slot"
                     for spool in spools:
                         if spool['filament']['name'] == filament['name']:
                             msg = f"Filament {filament['name']} is found in another slot: {spool['location'].split(':')[1]}"
                             mismatch = "warning"
                             swap_table[tool_id] = int(
                                 spool['location'].split(':')[1])
-                            await self._log_n_send(msg)
+                    await self._log_n_send((mismatch).upper()+': '+msg)
             else:
                 # if filament name from slicer is not the same as the one in spoolman db
                 if sm_tools[tool_id]['filament']['name'] != filament['name']:
-                    # if this spool is used for this print then there is a mismatch (else it's ok, but message is sent anyway)
-                    await self._log_n_send(f"Filament mismatch spoolman vs slicer @id {tool_id}")
-                    await self._log_n_send(f"{CONSOLE_TAB}- {sm_tools[tool_id]['filament']['name']} != {filament['name']}")
                     if filament['usage'] > 0:
                         # if this filament can be found on another slot, raise a warning and save the new slot number to replace in gcode later
                         mismatch = "critical"
+                        msg = f"Filament {filament['name']} not found on any other slot"
                         for spool in spools:
                             if spool['filament']['name'] == filament['name']:
                                 msg = f"Filament {filament['name']} is found in another slot: {spool['location'].split(':')[1]}"
                                 mismatch = "warning"
                                 swap_table[tool_id] = int(
                                     spool['location'].split(':')[1])
-                                await self._log_n_send(msg)
+                        await self._log_n_send((mismatch).upper()+': '+msg)
                     else:
                         await self._log_n_send(f"{CONSOLE_TAB}  * This filament is not used during this print (not pausing the printer)")
 
@@ -655,7 +655,7 @@ class SpoolManager:
             if swap_table.count(swap_table[i]) > 1 and swap_table[i] != None:
                 msg = f"Swap table is not consistent: {swap_table}, more than one slot has been swapped to same slot."
                 mismatch = "critical"
-                await self._log_n_send(msg)
+                await self._log_n_send((mismatch).upper()+': '+msg)
 
         if mismatch == "critical":
             return mismatch, swap_table
@@ -669,11 +669,11 @@ class SpoolManager:
                 _tool_id = swap_table[tool_id]
             # else use the original tool id and verify that the amount of filament left is sufficient
             if (_tool_id in sm_tools) and (filament['usage'] > sm_tools[_tool_id]['remaining_weight']):
-                msg = f"WARNING : Filament amount insufficient for spool {filament['name']}: {sm_tools[_tool_id]['remaining_weight']*100/100} < {filament['usage']*100/100}"
+                msg = f"Filament amount insufficient for spool {filament['name']}: {sm_tools[_tool_id]['remaining_weight']*100/100} < {filament['usage']*100/100}"
                 mismatch = "critical"
-                await self._log_n_send(msg)
+                await self._log_n_send((mismatch).upper()+': '+msg)
                 msg = f"Expect filament runout for machine {self.printer_info['hostname']}, or setup the mmu in order to avoid this."
-                await self._log_n_send(msg)
+                await self._log_n_send((mismatch).upper()+': '+msg)
         if mismatch == "critical":
             return mismatch, swap_table
 
@@ -682,7 +682,7 @@ class SpoolManager:
             if self.spool_id != sm_tools[0]['id']:
                 msg = f"Active spool mismatch: {self.spool_id} != {sm_tools[0]['id']}"
                 mismatch = "critical"
-                await self._log_n_send(msg)
+                await self._log_n_send((mismatch).upper()+': '+msg)
                 return mismatch
 
         return mismatch, swap_table
