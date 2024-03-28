@@ -1069,6 +1069,5 @@ class SpoolManager:
         spool_id = await self._get_active_spool()
         return await self.get_info_for_spool(spool_id)
 
-
 def load_component(config: ConfigHelper) -> SpoolManager:
     return SpoolManager(config)
