@@ -935,6 +935,7 @@ class SpoolManager:
         based on the filament type and the amount of filament left in spoolman db.
         '''
         logging.info("Checking filaments")
+        await self.get_spools_for_machine(silent=True)
         await self._log_n_send("Checking filament consistency: ")
         try:
             print_stats = await self.klippy_apis.query_objects({"print_stats": None})
