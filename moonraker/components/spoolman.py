@@ -929,7 +929,7 @@ class SpoolManager:
             await self._log_n_send(msg)
             return False
 
-    async def check_filament(self, debug=False):
+    async def check_filament(self):
         '''
         Uses metadata from the gcode to identify the filaments and runs some verifications
         based on the filament type and the amount of filament left in spoolman db.
@@ -959,8 +959,7 @@ class SpoolManager:
             self.server.send_event(
                 "spoolman:check_failure", {"message": msg}
             )
-            if not debug:
-                return False
+            return False
 
         # Get gcode from file
         if filename is None:
@@ -968,19 +967,16 @@ class SpoolManager:
             self.server.send_event(
                 "spoolman:check_failure", {"message": "Filename is None"}
             )
-            if not debug:
-                return False
+            return False
 
         metadata: Dict[str, Any] = {}
         if not filename:
             logging.info("No filemame retrieved: {filename}")
-            if not debug:
-                sys.exit(-1)
+            sys.exit(-1)
         try:
             metadata = extract_metadata(filename, False)
         except TimeoutError as e:
-            if not debug:
-                raise TimeoutError(f"Failed to extract metadata from {filename}") from e
+            raise TimeoutError(f"Failed to extract metadata from {filename}") from e
 
         # check that active spool is in machine's slots
         active_spool_id = await self._get_active_spool()
@@ -990,34 +986,30 @@ class SpoolManager:
             self.server.send_event(
                 "spoolman:check_failure", {"message": msg}
             )
-            if not debug:
-                return False
+            return False
 
         if self.slot_occupation == False:
             msg = "Failed to retrieve spools from spoolman"
             self.server.send_event(
                 "spoolman:check_failure", {"message": msg}
             )
-            if not debug:
-                return False
+            return False
         found = False
         for spool in self.slot_occupation:
             if int(spool['id']) == active_spool_id:
                 found = True
-        if not found:
+        if not found and self.filament_slots == 1:
             await self._log_n_send(f"Active spool {active_spool_id} is not assigned to this machine")
             await self._log_n_send("Run : ")
             await self._log_n_send(f"{CONSOLE_TAB}SET_SPOOL_SLOT ID={active_spool_id} SLOT=integer")
-            if not debug:
-                return False
+            return False
 
         if not self.slot_occupation:
             msg = f"No spools assigned to machine {self.printer_info['hostname']}"
             self.server.send_event(
                 "spoolman:check_failure", {"message": msg}
             )
-            if not debug:
-                return False
+            return False
 
         mismatch, swap_table = await self.verify_consistency(metadata, self.slot_occupation)
         if mismatch != "critical":
@@ -1036,8 +1028,7 @@ class SpoolManager:
                 await self.klippy_apis.run_gcode("M300 P2000 S4000")
                 if not await self.klippy_apis.query_objects({"pause_resume": None})['pause_resume']['is_paused'] :
                     await self.klippy_apis.pause_print()
-                if not debug:
-                    return False
+                return False
             else:
                 msg1 = "FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED!"
                 await self._log_n_send(msg1)
@@ -1054,8 +1045,7 @@ class SpoolManager:
         else :
             await self._gen_swap_table_cfg([None for __ in range(self.filament_slots)])
 
-        if not debug:
-            return True
+        return True
 
     async def _gen_swap_table_cfg(self, swap_table):
         '''
