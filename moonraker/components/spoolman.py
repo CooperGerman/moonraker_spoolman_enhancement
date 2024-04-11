@@ -614,7 +614,6 @@ class SpoolManager:
         # check list length
         if len(sm_tools) != len(metadata_tools):
             msg = f"Number of tools mismatch between spoolman slicer and klipper: {len(sm_tools)} != {len(metadata_tools)}"
-            mismatch = "warning"
             await self._log_n_send((mismatch).upper()+': '+msg)
 
         # check filaments names for each tool
@@ -623,35 +622,38 @@ class SpoolManager:
             # if tool_id from slicer is not in spoolman db
             if tool_id not in sm_tools:
                 msg = f"Tool id {tool_id} of machine {self.printer_info['hostname']} not assigned to a spool in spoolman db"
-                mismatch = "warning"
                 await self._log_n_send((mismatch).upper()+': '+msg)
                 if filament['usage'] > 0:
                     # if this filament can be found on another slot, raise a warning and save the new slot number to replace in gcode later
-                    mismatch = "critical"
-                    msg = f"Filament {filament['name']} not found on any other slot"
+                    found = False
                     for spool in spools:
                         if spool['filament']['name'] == filament['name']:
+                            found = True
                             msg = f"Filament {filament['name']} is found in another slot: {spool['location'].split(':')[1]}"
-                            mismatch = "warning"
                             swap_table[tool_id] = int(
                                 spool['location'].split(':')[1])
-                    await self._log_n_send((mismatch).upper()+': '+msg)
+                    if not found:
+                        mismatch = "critical"
+                        msg = f"Filament {filament['name']} not found on any other slot"
+                        await self._log_n_send((mismatch).upper()+': '+msg)
             else:
                 # if filament name from slicer is not the same as the one in spoolman db
                 if sm_tools[tool_id]['filament']['name'] != filament['name']:
                     if filament['usage'] > 0:
                         # if this filament can be found on another slot, raise a warning and save the new slot number to replace in gcode later
-                        mismatch = "critical"
-                        msg = f"Filament {filament['name']} not found on any other slot"
+                        found = False
                         for spool in spools:
                             if spool['filament']['name'] == filament['name']:
+                                found = True
                                 msg = f"Filament {filament['name']} is found in another slot: {spool['location'].split(':')[1]}"
-                                mismatch = "warning"
                                 swap_table[tool_id] = int(
                                     spool['location'].split(':')[1])
-                        await self._log_n_send((mismatch).upper()+': '+msg)
+                        if not found:
+                            mismatch = "critical"
+                            msg = f"Filament {filament['name']} not found on any other slot"
+                            await self._log_n_send((mismatch).upper()+': '+msg)
                     else:
-                        await self._log_n_send(f"{CONSOLE_TAB}  * This filament is not used during this print (not pausing the printer)")
+                        await self._log_n_send((mismatch).upper()+f": Filament {filament['name']} is not used during this print (not pausing the printer)")
 
         # verify swap table is consistent (not more than one index pointing to same value)
         for i in range(len(swap_table)):
@@ -1067,27 +1069,27 @@ class SpoolManager:
 
         mismatch, swap_table = await self.verify_consistency(metadata, self.slot_occupation)
         if mismatch != "critical":
-            msg = "Slicer setup and spoolman db are consistent"
-            await self._log_n_send(msg)
-        else:
-            if mismatch == "critical":
-                msg1 = "FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED! PAUSING PRINT."
-                await self._log_n_send(msg1)
-                msg2 = "Please check the spoolman setup and physical spools to match the slicer setup."
-                await self._log_n_send(msg2)
-                # if printer is runnning, pause it
-                self.server.send_event(
-                    "spoolman:check_failure", {"message": msg1+msg2}
-                )
-                await self.klippy_apis.run_gcode("M300 P2000 S4000")
-                if not await self.klippy_apis.query_objects({"pause_resume": None})['pause_resume']['is_paused'] :
-                    await self.klippy_apis.pause_print()
-                return False
-            else:
+            if mismatch == 'warning':
                 msg1 = "FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED!"
-                await self._log_n_send(msg1)
+                await self._log_n_send(mismatch.upper()+': '+msg1)
                 msg2 = "Minor mismatches have been found, proceeding to print."
-                await self._log_n_send(msg2)
+                await self._log_n_send(mismatch.upper()+': '+msg2)
+            else:
+                msg = "Slicer setup and spoolman db are consistent"
+                await self._log_n_send(mismatch.upper()+': '+msg)
+        else:
+            msg1 = "FILAMENT MISMATCH(ES) BETWEEN SPOOLMAN AND SLICER DETECTED! PAUSING PRINT."
+            await self._log_n_send(mismatch.upper()+': '+msg1)
+            msg2 = "Please check the spoolman setup and physical spools to match the slicer setup."
+            await self._log_n_send(mismatch.upper()+': '+msg2)
+            # if printer is runnning, pause it
+            self.server.send_event(
+                "spoolman:check_failure", {"message": msg1+msg2}
+            )
+            if not await self.klippy_apis.query_objects({"pause_resume": None})['pause_resume']['is_paused'] :
+                await self.klippy_apis.pause_print()
+            await self.klippy_apis.run_gcode("M300 P2000 S4000")
+            return False
 
         # if swap table is not empty, prompt user for automatic tools swap
         if swap_table:
