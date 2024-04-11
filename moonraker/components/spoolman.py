@@ -1086,7 +1086,7 @@ class SpoolManager:
             self.server.send_event(
                 "spoolman:check_failure", {"message": msg1+msg2}
             )
-            if not await self.klippy_apis.query_objects({"pause_resume": None})['pause_resume']['is_paused'] :
+            if state != 'paused':
                 await self.klippy_apis.pause_print()
             await self.klippy_apis.run_gcode("M300 P2000 S4000")
             return False
