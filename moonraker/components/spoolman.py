@@ -109,6 +109,9 @@ class SpoolManager:
             "spoolman_set_spool_slot", self.set_spool_slot
         )
         self.server.register_remote_method(
+            "spoolman_unset_spool_slot", self.unset_spool_slot
+        )
+        self.server.register_remote_method(
             "spoolman_clear_spool_slots", self.clear_spool_slots
         )
 
@@ -880,6 +883,57 @@ class SpoolManager:
             await self.set_active_slot(slot)
             await self._log_n_send(f"{CONSOLE_TAB*2}Setting slot 0 as active (single slot machine)")
         return True
+
+    async def unset_spool_slot(self, slot: int) -> bool:
+        '''
+        Unsets the slot number for the current machine
+        '''
+        logging.info(
+            f"Clearing slot {slot} for machine: {self.printer_info['hostname']}")
+        self.server.send_event(
+            "spoolman:clear_spool_slot", {"slot": slot}
+        )
+        # get spools assigned to current machine
+        spools = self.slot_occupation
+        if spools not in [False, None]:
+            for spool in spools:
+                if int(spool['location'].split(':')[1]) == slot:
+                    # use the PATCH method on the spoolman api
+                    # get current printer hostname
+                    machine_hostname = self.printer_info["hostname"]
+                    logging.info(
+                        f"Clearing spool {spool['id']} for machine: {machine_hostname}")
+                    # get spool info from spoolman
+                    body = {
+                        "location": "",
+                    }
+                    args = {
+                        "request_method": "PATCH",
+                        "path": f"/v1/spool/{spool['id']}",
+                        "body": body,
+                    }
+                    webrequest = WebRequest(
+                        endpoint=f"{self.spoolman_url}/spools/{spool['id']}",
+                        args=args,
+                        request_type=RequestType.POST,
+                    )
+                    try:
+                        await self._proxy_spoolman_request(webrequest)
+                    except Exception as e:
+                        logging.error(
+                            f"Failed to clear spool {spool['id']} for machine {machine_hostname}: {e}")
+                        await self._log_n_send(f"Failed to clear spool {spool['id']} for machine {machine_hostname}")
+                        return False
+                    await self._log_n_send(f"Spool {spool['id']} cleared for machine {machine_hostname}")
+                    await self.get_spools_for_machine(silent=True)
+                    return True
+            msg = f"No spool assigned to slot {slot} for machine {self.printer_info['hostname']}"
+            await self._log_n_send(msg)
+            return False
+        else:
+            msg = f"No spools for machine {self.printer_info['hostname']}"
+            await self._log_n_send(msg)
+            return False
 
     async def clear_spool_slots(self) -> bool:
         '''
