@@ -744,7 +744,7 @@ class SpoolManager:
         self.slot_occupation = spools
         await self.klippy_apis.run_gcode("SAVE_VARIABLE VARIABLE=mmu_slots VALUE=\"{}\"".format(self.slot_occupation))
 
-    async def unset_spool_slot(self, spool_id: int) -> bool:
+    async def unset_spool_id(self, spool_id: int) -> bool:
         '''
         Removes the machine:slot allocation in spoolman db for spool_id
 
@@ -840,7 +840,7 @@ class SpoolManager:
                 if int(spool['location'].split(':')[1]) == slot:
                     await self._log_n_send(f"Slot {slot} is already assigned to spool {spool['filament']['name']} (id: {spool['id']})")
                     await self._log_n_send(f"{CONSOLE_TAB}- Overwriting slot assignment")
-                    if not await self.unset_spool_slot(spool['id']):
+                    if not await self.unset_spool_id(spool['id']):
                         await self._log_n_send(f"{CONSOLE_TAB*2}Failed to unset spool {spool['filament']['name']} (id: {spool['id']}) from slot {slot}")
                         return False
                     await self._log_n_send(f"{CONSOLE_TAB*2}Spool {spool['filament']['name']} (id: {spool['id']}) unset from slot {slot}")
