@@ -739,12 +739,11 @@ class SpoolManager:
                         await self._log_n_send(f"{CONSOLE_TAB}{i} : {spool['filament']['name']}")
                     else:
                         await self._log_n_send(f"{CONSOLE_TAB}{i} : empty")
-        else :
-            if not silent :
-                await self._log_n_send(f"No spools assigned to machine: {machine_hostname}")
-            return False
+        if not silent :
+            await self._log_n_send(f"No spools assigned to machine: {machine_hostname}")
         self.slot_occupation = spools
         await self.klippy_apis.run_gcode("SAVE_VARIABLE VARIABLE=mmu_slots VALUE=\"{}\"".format(self.slot_occupation))
+        return False
 
     async def unset_spool_id(self, spool_id: int) -> bool:
         '''
@@ -763,7 +762,7 @@ class SpoolManager:
         # get current printer hostname
         machine_hostname = self.printer_info["hostname"]
         logging.info(
-            f"Unsetting spool {spool_id} for machine: {machine_hostname}")
+            f"Unsetting spool if {spool_id} for machine: {machine_hostname}")
         # get spool info from spoolman
         body = {
             "location": "",
@@ -886,54 +885,26 @@ class SpoolManager:
             await self._log_n_send(f"{CONSOLE_TAB*2}Setting slot 0 as active (single slot machine)")
         return True
 
-    async def unset_spool_slot(self, slot: int) -> bool:
+    async def unset_spool_slot(self, slot: int = 0) -> bool:
         '''
         Unsets the slot number for the current machine
         '''
-        logging.info(
-            f"Clearing slot {slot} for machine: {self.printer_info['hostname']}")
-        self.server.send_event(
-            "spoolman:clear_spool_slot", {"slot": slot}
-        )
         # get spools assigned to current machine
-        spools = self.slot_occupation
-        if spools not in [False, None]:
-            for spool in spools:
+        if self.slot_occupation not in [False, None]:
+            for spool in self.slot_occupation:
                 if int(spool['location'].split(':')[1]) == slot:
-                    # use the PATCH method on the spoolman api
-                    # get current printer hostname
-                    machine_hostname = self.printer_info["hostname"]
                     logging.info(
-                        f"Clearing spool {spool['id']} for machine: {machine_hostname}")
-                    # get spool info from spoolman
-                    body = {
-                        "location": "",
-                    }
-                    args = {
-                        "request_method": "PATCH",
-                        "path": f"/v1/spool/{spool['id']}",
-                        "body": body,
-                    }
-                    webrequest = WebRequest(
-                        endpoint=f"{self.spoolman_url}/spools/{spool['id']}",
-                        args=args,
-                        request_type=RequestType.POST,
+                        f"Clearing slot {slot} for machine: {self.printer_info['hostname']}")
+                    self.server.send_event(
+                        "spoolman:clear_spool_slot", {"slot": slot}
                     )
-                    try:
-                        await self._proxy_spoolman_request(webrequest)
-                    except Exception as e:
-                        logging.error(
-                            f"Failed to clear spool {spool['id']} for machine {machine_hostname}: {e}")
-                        await self._log_n_send(f"Failed to clear spool {spool['id']} for machine {machine_hostname}")
-                        return False
-                    await self._log_n_send(f"Spool {spool['id']} cleared for machine {machine_hostname}")
-                    await self.get_spools_for_machine(silent=True)
+                    await self.unset_spool_id(spool['id'])
+                    await self._log_n_send(f"Slot {slot} cleared")
                     return True
-            msg = f"No spool assigned to slot {slot} for machine {self.printer_info['hostname']}"
-            await self._log_n_send(msg)
+            await self._log_n_send(f"No spool assigned to slot {slot}")
             return False
         else:
-            msg = f"No spools for machine {self.printer_info['hostname']}"
+            msg = f"No spools found for this machine"
             await self._log_n_send(msg)
             return False
 
