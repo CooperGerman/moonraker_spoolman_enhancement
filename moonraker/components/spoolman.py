@@ -739,7 +739,7 @@ class SpoolManager:
                         await self._log_n_send(f"{CONSOLE_TAB}{i} : {spool['filament']['name']}")
                     else:
                         await self._log_n_send(f"{CONSOLE_TAB}{i} : empty")
-        if not silent :
+        if not silent and not spools:
             await self._log_n_send(f"No spools assigned to machine: {machine_hostname}")
         self.slot_occupation = spools
         await self.klippy_apis.run_gcode("SAVE_VARIABLE VARIABLE=mmu_slots VALUE=\"{}\"".format(self.slot_occupation))
