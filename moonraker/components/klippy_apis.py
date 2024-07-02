@@ -5,6 +5,7 @@
 # This file may be distributed under the terms of the GNU GPLv3 license.
 
 from __future__ import annotations
+import logging
 from ..utils import Sentinel
 from ..common import WebRequest, APITransport, RequestType
 
@@ -23,6 +24,7 @@ from typing import (
 )
 if TYPE_CHECKING:
     from ..confighelper import ConfigHelper
+    from ..common import UserInfo
     from .klippy_connection import KlippyConnection as Klippy
     Subscription = Dict[str, Optional[List[Any]]]
     SubCallback = Callable[[Dict[str, Dict[str, Any]], float], Optional[Coroutine]]
@@ -88,7 +90,8 @@ class KlippyAPI(APITransport):
 
     async def _gcode_start_print(self, web_request: WebRequest) -> str:
         filename: str = web_request.get_str('filename')
-        return await self.start_print(filename)
+        user = web_request.get_current_user()
+        return await self.start_print(filename, user=user)
 
     async def _gcode_restart(self, web_request: WebRequest) -> str:
         return await self.do_restart("RESTART")
@@ -122,7 +125,10 @@ class KlippyAPI(APITransport):
         return result
 
     async def start_print(
-        self, filename: str, wait_klippy_started: bool = False
+        self,
+        filename: str,
+        wait_klippy_started: bool = False,
+        user: Optional[UserInfo] = None
     ) -> str:
         # WARNING: Do not call this method from within the following
         # event handlers when "wait_klippy_started" is set to True:
@@ -137,12 +143,16 @@ class KlippyAPI(APITransport):
         script = f'SDCARD_PRINT_FILE FILENAME="{filename}"'
         if wait_klippy_started:
             await self.klippy.wait_started()
-        return await self.run_gcode(script)
+        logging.info(f"Requesting Job Start, filename = {filename}")
+        ret = await self.run_gcode(script)
+        self.server.send_event("klippy_apis:job_start_complete", user)
+        return ret
 
     async def pause_print(
         self, default: Union[Sentinel, _T] = Sentinel.MISSING
     ) -> Union[_T, str]:
         self.server.send_event("klippy_apis:pause_requested")
+        logging.info("Requesting job pause...")
         return await self._send_klippy_request(
             "pause_resume/pause", {}, default)
 
@@ -150,6 +160,7 @@ class KlippyAPI(APITransport):
         self, default: Union[Sentinel, _T] = Sentinel.MISSING
     ) -> Union[_T, str]:
         self.server.send_event("klippy_apis:resume_requested")
+        logging.info("Requesting job resume...")
         return await self._send_klippy_request(
             "pause_resume/resume", {}, default)
 
@@ -157,6 +168,7 @@ class KlippyAPI(APITransport):
         self, default: Union[Sentinel, _T] = Sentinel.MISSING
     ) -> Union[_T, str]:
         self.server.send_event("klippy_apis:cancel_requested")
+        logging.info("Requesting job cancel...")
         return await self._send_klippy_request(
             "pause_resume/cancel", {}, default)
 

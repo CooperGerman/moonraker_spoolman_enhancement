@@ -61,8 +61,8 @@ SERVER_COMPONENTS = ['application', 'websockets', 'klippy_connection']
 CORE_COMPONENTS = [
     'dbus_manager', 'database', 'file_manager', 'authorization',
     'klippy_apis', 'machine', 'data_store', 'shell_command',
-    'proc_stats', 'job_state', 'job_queue', 'http_client',
-    'announcements', 'webcam', 'extensions'
+    'proc_stats', 'job_state', 'job_queue', 'history',
+    'http_client', 'announcements', 'webcam', 'extensions'
 ]
 
 
@@ -423,6 +423,12 @@ class Server:
     def _handle_term_signal(self) -> None:
         logging.info("Exiting with signal SIGTERM")
         self.event_loop.register_callback(self._stop_server, "terminate")
+
+    def restart(self, delay: Optional[float] = None) -> None:
+        if delay is None:
+            self.event_loop.register_callback(self._stop_server)
+        else:
+            self.event_loop.delay_callback(delay, self._stop_server)
 
     async def _stop_server(self, exit_reason: str = "restart") -> None:
         self.server_running = False

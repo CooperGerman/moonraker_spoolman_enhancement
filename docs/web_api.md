@@ -262,7 +262,7 @@ Returns:
 An object containing various fields that report server state.
 
 ```json
-  {
+{
     "klippy_connected": true,
     "klippy_state": "ready",
     "components": [
@@ -288,7 +288,7 @@ An object containing various fields that report server state.
     "moonraker_version": "v0.7.1-105-ge4f103c",
     "api_version": [1, 0, 0],
     "api_version_string": "1.0.0"
-  }
+}
 ```
 !!! warning
     This object also includes `plugins` and `failed_plugins` fields that
@@ -328,162 +328,160 @@ included.
 
 ```json
 {
-    {
-        "config": {
-            "server": {
-                "host": "0.0.0.0",
-                "port": 7125,
-                "ssl_port": 7130,
-                "enable_debug_logging": true,
-                "enable_asyncio_debug": false,
-                "klippy_uds_address": "/tmp/klippy_uds",
-                "max_upload_size": 210,
-                "ssl_certificate_path": null,
-                "ssl_key_path": null
-            },
-            "dbus_manager": {},
-            "database": {
-                "database_path": "~/.moonraker_database",
-                "enable_database_debug": false
-            },
-            "file_manager": {
-                "enable_object_processing": true,
-                "queue_gcode_uploads": true,
-                "config_path": "~/printer_config",
-                "log_path": "~/logs"
-            },
-            "klippy_apis": {},
-            "machine": {
-                "provider": "systemd_dbus"
-            },
-            "shell_command": {},
-            "data_store": {
-                "temperature_store_size": 1200,
-                "gcode_store_size": 1000
-            },
-            "proc_stats": {},
-            "job_state": {},
-            "job_queue": {
-                "load_on_startup": true,
-                "automatic_transition": false,
-                "job_transition_delay": 2,
-                "job_transition_gcode": "\nM118 Transitioning to next job..."
-            },
-            "http_client": {},
-            "announcements": {
-                "dev_mode": false,
-                "subscriptions": []
-            },
-            "authorization": {
-                "login_timeout": 90,
-                "force_logins": false,
-                "cors_domains": [
-                    "*.home",
-                    "http://my.mainsail.xyz",
-                    "http://app.fluidd.xyz",
-                    "*://localhost:*"
-                ],
-                "trusted_clients": [
-                    "192.168.1.0/24"
-                ]
-            },
-            "zeroconf": {},
-            "octoprint_compat": {
-                "enable_ufp": true,
-                "flip_h": false,
-                "flip_v": false,
-                "rotate_90": false,
-                "stream_url": "/webcam/?action=stream",
-                "webcam_enabled": true
-            },
-            "history": {},
-            "secrets": {
-                "secrets_path": "~/moonraker_secrets.ini"
-            },
-            "mqtt": {
-                "address": "eric-work.home",
-                "port": 1883,
-                "username": "{secrets.mqtt_credentials.username}",
-                "password_file": null,
-                "password": "{secrets.mqtt_credentials.password}",
-                "mqtt_protocol": "v3.1.1",
-                "instance_name": "pi-debugger",
-                "default_qos": 0,
-                "status_objects": {
-                    "webhooks": null,
-                    "toolhead": "position,print_time",
-                    "idle_timeout": "state",
-                    "gcode_macro M118": null
-                },
-                "api_qos": 0,
-                "enable_moonraker_api": true
-            },
-            "template": {}
+    "config": {
+        "server": {
+            "host": "0.0.0.0",
+            "port": 7125,
+            "ssl_port": 7130,
+            "enable_debug_logging": true,
+            "enable_asyncio_debug": false,
+            "klippy_uds_address": "/tmp/klippy_uds",
+            "max_upload_size": 210,
+            "ssl_certificate_path": null,
+            "ssl_key_path": null
         },
-        "orig": {
-            "DEFAULT": {},
-            "server": {
-                "enable_debug_logging": "True",
-                "max_upload_size": "210"
-            },
-            "file_manager": {
-                "config_path": "~/printer_config",
-                "log_path": "~/logs",
-                "queue_gcode_uploads": "True",
-                "enable_object_processing": "True"
-            },
-            "machine": {
-                "provider": "systemd_dbus"
-            },
-            "announcements": {},
-            "job_queue": {
-                "job_transition_delay": "2.",
-                "job_transition_gcode": "\nM118 Transitioning to next job...",
-                "load_on_startup": "True"
-            },
-            "authorization": {
-                "trusted_clients": "\n192.168.1.0/24",
-                "cors_domains": "\n*.home\nhttp://my.mainsail.xyz\nhttp://app.fluidd.xyz\n*://localhost:*"
-            },
-            "zeroconf": {},
-            "octoprint_compat": {},
-            "history": {},
-            "secrets": {
-                "secrets_path": "~/moonraker_secrets.ini"
-            },
-            "mqtt": {
-                "address": "eric-work.home",
-                "port": "1883",
-                "username": "{secrets.mqtt_credentials.username}",
-                "password": "{secrets.mqtt_credentials.password}",
-                "enable_moonraker_api": "True",
-                "status_objects": "\nwebhooks\ntoolhead=position,print_time\nidle_timeout=state\ngcode_macro M118"
-            }
+        "dbus_manager": {},
+        "database": {
+            "database_path": "~/.moonraker_database",
+            "enable_database_debug": false
         },
-        "files": [
-            {
-                "filename": "moonraker.conf",
-                "sections": [
-                    "server",
-                    "file_manager",
-                    "machine",
-                    "announcements",
-                    "job_queue",
-                    "authorization",
-                    "zeroconf",
-                    "octoprint_compat",
-                    "history",
-                    "secrets"
-                ]
+        "file_manager": {
+            "enable_object_processing": true,
+            "queue_gcode_uploads": true,
+            "config_path": "~/printer_config",
+            "log_path": "~/logs"
+        },
+        "klippy_apis": {},
+        "machine": {
+            "provider": "systemd_dbus"
+        },
+        "shell_command": {},
+        "data_store": {
+            "temperature_store_size": 1200,
+            "gcode_store_size": 1000
+        },
+        "proc_stats": {},
+        "job_state": {},
+        "job_queue": {
+            "load_on_startup": true,
+            "automatic_transition": false,
+            "job_transition_delay": 2,
+            "job_transition_gcode": "\nM118 Transitioning to next job..."
+        },
+        "http_client": {},
+        "announcements": {
+            "dev_mode": false,
+            "subscriptions": []
+        },
+        "authorization": {
+            "login_timeout": 90,
+            "force_logins": false,
+            "cors_domains": [
+                "*.home",
+                "http://my.mainsail.xyz",
+                "http://app.fluidd.xyz",
+                "*://localhost:*"
+            ],
+            "trusted_clients": [
+                "192.168.1.0/24"
+            ]
+        },
+        "zeroconf": {},
+        "octoprint_compat": {
+            "enable_ufp": true,
+            "flip_h": false,
+            "flip_v": false,
+            "rotate_90": false,
+            "stream_url": "/webcam/?action=stream",
+            "webcam_enabled": true
+        },
+        "history": {},
+        "secrets": {
+            "secrets_path": "~/moonraker_secrets.ini"
+        },
+        "mqtt": {
+            "address": "eric-work.home",
+            "port": 1883,
+            "username": "{secrets.mqtt_credentials.username}",
+            "password_file": null,
+            "password": "{secrets.mqtt_credentials.password}",
+            "mqtt_protocol": "v3.1.1",
+            "instance_name": "pi-debugger",
+            "default_qos": 0,
+            "status_objects": {
+                "webhooks": null,
+                "toolhead": "position,print_time",
+                "idle_timeout": "state",
+                "gcode_macro M118": null
             },
-            {
-                "filename": "include/extras.conf",
-                "sections": [
-                    "mqtt"
-                ]
-            }
-        ]
-    }
+            "api_qos": 0,
+            "enable_moonraker_api": true
+        },
+        "template": {}
+    },
+    "orig": {
+        "DEFAULT": {},
+        "server": {
+            "enable_debug_logging": "True",
+            "max_upload_size": "210"
+        },
+        "file_manager": {
+            "config_path": "~/printer_config",
+            "log_path": "~/logs",
+            "queue_gcode_uploads": "True",
+            "enable_object_processing": "True"
+        },
+        "machine": {
+            "provider": "systemd_dbus"
+        },
+        "announcements": {},
+        "job_queue": {
+            "job_transition_delay": "2.",
+            "job_transition_gcode": "\nM118 Transitioning to next job...",
+            "load_on_startup": "True"
+        },
+        "authorization": {
+            "trusted_clients": "\n192.168.1.0/24",
+            "cors_domains": "\n*.home\nhttp://my.mainsail.xyz\nhttp://app.fluidd.xyz\n*://localhost:*"
+        },
+        "zeroconf": {},
+        "octoprint_compat": {},
+        "history": {},
+        "secrets": {
+            "secrets_path": "~/moonraker_secrets.ini"
+        },
+        "mqtt": {
+            "address": "eric-work.home",
+            "port": "1883",
+            "username": "{secrets.mqtt_credentials.username}",
+            "password": "{secrets.mqtt_credentials.password}",
+            "enable_moonraker_api": "True",
+            "status_objects": "\nwebhooks\ntoolhead=position,print_time\nidle_timeout=state\ngcode_macro M118"
+        }
+    },
+    "files": [
+        {
+            "filename": "moonraker.conf",
+            "sections": [
+                "server",
+                "file_manager",
+                "machine",
+                "announcements",
+                "job_queue",
+                "authorization",
+                "zeroconf",
+                "octoprint_compat",
+                "history",
+                "secrets"
+            ]
+        },
+        {
+            "filename": "include/extras.conf",
+            "sections": [
+                "mqtt"
+            ]
+        }
+    ]
 }
 ```
 
@@ -529,7 +527,7 @@ Note that when the host starts each array is initialized to 0s.
     "temperature_fan my_fan": {
         "temperatures": [21.05, 21.12, 21.1, 21.1, 21.1],
         "targets": [0, 0, 0, 0, 0],
-        "speeds": [0, 0, 0, 0, 0],
+        "speeds": [0, 0, 0, 0, 0]
     },
     "temperature_sensor my_sensor": {
         "temperatures": [21.05, 21.12, 21.1, 21.1, 21.1]
@@ -550,7 +548,8 @@ JSON-RPC request:
     "params": {
         "count": 100
     },
-    "id": 7643}
+    "id": 7643
+}
 ```
 
 The `count` argument is optional, limiting number of returned items
@@ -804,7 +803,7 @@ The full JSON-RPC response.
         "klipper_path": "/home/pi/klipper",
         "python_path": "/home/pi/klippy-env/bin/python",
         "log_file": "/tmp/klippy.log",
-        "config_file": "/home/pi/printer.cfg",
+        "config_file": "/home/pi/printer.cfg"
     }
 }
 ```
@@ -976,7 +975,7 @@ An object where the top level items are "eventtime" and "status".  The
             "homing_origin": [0, 0, 0, 0],
             "position": [0, 0, 0, 0],
             "speed": 1500,
-            "speed_factor": 1,
+            "speed_factor": 1
         },
         "toolhead": {
             "position": [0, 0, 0, 0],
@@ -1940,6 +1939,7 @@ GET /machine/peripherals/video
             "camera_name": "unicam",
             "driver_name": "unicam",
             "hardware_bus": "platform:3f801000.csi",
+            "modes": [],
             "capabilities": [
                 "VIDEO_CAPTURE",
                 "EXT_PIX_FORMAT",
@@ -1959,6 +1959,62 @@ GET /machine/peripherals/video
             "camera_name": "UVC Camera (046d:0825)",
             "driver_name": "uvcvideo",
             "hardware_bus": "usb-3f980000.usb-1.1",
+            "modes": [
+                {
+                    "format": "YUYV",
+                    "description": "YUYV 4:2:2",
+                    "flags": [],
+                    "resolutions": [
+                        "640x480",
+                        "160x120",
+                        "176x144",
+                        "320x176",
+                        "320x240",
+                        "352x288",
+                        "432x240",
+                        "544x288",
+                        "640x360",
+                        "752x416",
+                        "800x448",
+                        "800x600",
+                        "864x480",
+                        "960x544",
+                        "960x720",
+                        "1024x576",
+                        "1184x656",
+                        "1280x720",
+                        "1280x960"
+                    ]
+                },
+                {
+                    "format": "MJPG",
+                    "description": "Motion-JPEG",
+                    "flags": [
+                        "COMPRESSED"
+                    ],
+                    "resolutions": [
+                        "640x480",
+                        "160x120",
+                        "176x144",
+                        "320x176",
+                        "320x240",
+                        "352x288",
+                        "432x240",
+                        "544x288",
+                        "640x360",
+                        "752x416",
+                        "800x448",
+                        "800x600",
+                        "864x480",
+                        "960x544",
+                        "960x720",
+                        "1024x576",
+                        "1184x656",
+                        "1280x720",
+                        "1280x960"
+                    ]
+                }
+            ],
             "capabilities": [
                 "VIDEO_CAPTURE",
                 "EXT_PIX_FORMAT",
@@ -1976,6 +2032,7 @@ GET /machine/peripherals/video
             "camera_name": "bcm2835-isp",
             "driver_name": "bcm2835-isp",
             "hardware_bus": "platform:bcm2835-isp",
+            "modes": [],
             "capabilities": [
                 "VIDEO_CAPTURE",
                 "EXT_PIX_FORMAT",
@@ -1993,6 +2050,7 @@ GET /machine/peripherals/video
             "camera_name": "bcm2835-isp",
             "driver_name": "bcm2835-isp",
             "hardware_bus": "platform:bcm2835-isp",
+            "modes": [],
             "capabilities": [
                 "VIDEO_CAPTURE",
                 "EXT_PIX_FORMAT",
@@ -2010,6 +2068,7 @@ GET /machine/peripherals/video
             "camera_name": "bcm2835-isp",
             "driver_name": "bcm2835-isp",
             "hardware_bus": "platform:bcm2835-isp",
+            "modes": [],
             "capabilities": [
                 "VIDEO_CAPTURE",
                 "EXT_PIX_FORMAT",
@@ -2027,6 +2086,7 @@ GET /machine/peripherals/video
             "camera_name": "bcm2835-isp",
             "driver_name": "bcm2835-isp",
             "hardware_bus": "platform:bcm2835-isp",
+            "modes": [],
             "capabilities": [
                 "VIDEO_CAPTURE",
                 "EXT_PIX_FORMAT",
@@ -2135,6 +2195,7 @@ V4L2 Device
 | `alt_name`         | string? | An alternative device name optionally reported by        |
 |                    |         | sysfs.  Will be `null` if the name file does not exist.  |^
 | `hardware_bus`     | string  | A description of the hardware location of the device     |
+| `modes`            |  array  | An array of V4L2 mode objects.                           |
 | `capabilities`     |  array  | An array of strings indicating the capabilities the      |
 |                    |         | device supports as reported by V4L2.                     |^
 | `version`          | string  | The device version as reported by V4L2.                  |
@@ -2145,6 +2206,16 @@ V4L2 Device
 |                    |         | ID. Will be  `null` if no matching link exists.          |^
 | `usb_location`     | string? | An identifier derived from the reported usb bus and      |
 |                    |         | device numbers. Will be `null` for non-usb devices.      |^
+
+V4L2 Mode
+
+| Field         |  Type  | Description                                                  |
+| ------------- | :----: | ------------------------------------------------------------ |
+| `description` | string | The description of the mode reported by the V4L2 driver.     |
+| `flags`       | array  | An array of strings describing flags reported by the driver. |
+| `format`      | string | The pixel format of the mode.                                |
+| `resolutions` | array  | An array of strings describing the resolutions supported by  |
+|               |        | the mode.  Each entry is reported as `<WIDTH>x<HEIGHT>`      |^
 
 Libcamera Device
 
@@ -2323,7 +2394,7 @@ A list of objects, where each object contains file data.
         "modified": 1615768477.5133543,
         "size": 189713016,
         "permissions": "rw"
-    },
+    }
 ]
 ```
 
@@ -2620,7 +2691,7 @@ following format:
             "size": 2388774,
             "permissions": "rw",
             "filename": "CE2_calicat.gcode"
-        },
+        }
     ],
     "disk_usage": {
         "total": 7522213888,
@@ -2662,7 +2733,6 @@ Returns: Information about the created directory
         "modified": 1676983427.3732708,
         "size": 4096,
         "permissions": "rw"
-
     },
     "action": "create_dir"
 }
@@ -2746,20 +2816,18 @@ JSON-RPC request:
 Returns:  Information about the moved file or directory
 ```json
 {
-    "result": {
-        "item": {
-            "root": "gcodes",
-            "path": "subdir/my_file.gcode",
-            "modified": 1676940082.8595376,
-            "size": 384096,
-            "permissions": "rw"
-        },
-        "source_item": {
-            "path": "testdir/my_file.gcode",
-            "root": "gcodes"
-        },
-        "action": "move_file"
-    }
+    "item": {
+        "root": "gcodes",
+        "path": "subdir/my_file.gcode",
+        "modified": 1676940082.8595376,
+        "size": 384096,
+        "permissions": "rw"
+    },
+    "source_item": {
+        "path": "testdir/my_file.gcode",
+        "root": "gcodes"
+    },
+    "action": "move_file"
 }
 ```
 
@@ -3487,8 +3555,10 @@ the request.  The entire settings object could be accessed by providing
 may be read by omitting the `key` argument, however as explained below it
 is not possible to modify a namespace without specifying a key.
 
-#### List namespaces
-Lists all available namespaces.
+#### List Database Info
+
+Lists all namespaces with read and/or write access.  Also lists database
+backup files.
 
 HTTP request:
 ```http
@@ -3506,14 +3576,21 @@ JSON-RPC request:
 
 Returns:
 
-An object containing an array of namespaces in the following format:
+An object containing an array of namespaces and an array of backup files.
 ```json
 {
     "namespaces": [
         "gcode_metadata",
-        "history",
-        "moonraker",
-        "test_namespace"
+        "webcams",
+        "update_manager",
+        "announcements",
+        "database",
+        "moonraker"
+    ],
+    "backups": [
+        "sqldb-backup-20240513-134542.db",
+        "testbackup.db",
+        "testbackup2.db"
     ]
 }
 ```
@@ -3630,6 +3707,180 @@ deleted item.
     "namespace": "test",
     "key": "settings.some_count",
     "value": 9001
+}
+```
+
+#### Compact Database
+
+Compacts and defragments the the sqlite database using the `VACUUM` command.
+This API cannot be requested when Klipper is printing.
+
+HTTP request:
+```http
+POST /server/database/compact
+```
+
+JSON-RPC request:
+```json
+{
+    "jsonrpc": "2.0",
+    "method": "server.database.compact",
+    "id": 4654
+}
+```
+Returns:
+An object containing the size of the database on disk before and after
+the database is compacted.
+```json
+{
+    "previous_size": 139264,
+    "new_size": 122880
+}
+```
+
+#### Backup Database
+
+Creates a backup of the current database.  The backup will be
+created in the `<data_path>/backup/database/<filename>`.
+
+This API cannot be requested when Klipper is printing.
+
+HTTP request:
+```http
+POST /server/database/backup
+Content-Type: application/json
+
+{
+    "filename": "sql-db-backup.db"
+}
+```
+
+JSON-RPC request:
+```json
+{
+    "jsonrpc": "2.0",
+    "method": "server.database.post_backup",
+    "params": {
+        "filename": "sql-db-backup.db"
+    },
+    "id": 4654
+}
+```
+
+Parameters:
+
+- `filename`: An optional file name for the backup file.  The default
+   is `sqldb-backup-<year><month><day>-<hour><minute><second>`.
+
+
+Returns:
+An object containing the path on disk to the backup.
+```json
+{
+    "backup_path": "/home/test/printer_data/backup/database/sql-db-backup.db"
+}
+```
+
+#### Delete a backup
+
+Deletes a previously backed up database.
+
+HTTP request:
+```http
+DELETE /server/database/backup
+Content-Type: application/json
+
+{
+    "filename": "sql-db-backup.db"
+}
+```
+
+JSON-RPC request:
+```json
+{
+    "jsonrpc": "2.0",
+    "method": "server.database.delete_backup",
+    "params": {
+        "filename": "sql-db-backup.db"
+    },
+    "id": 4654
+}
+```
+
+Parameters:
+
+- `filename`: The name of the backup file to delete.  Must be a valid
+  filename reported in by the [database list](#list-database-info) API.
+  This parameter must be provided.
+
+Returns:
+An object containing the path on disk to the backup file that was removed.
+```json
+{
+    "backup_path": "/home/test/printer_data/backup/database/sql-db-backup.db"
+}
+```
+
+#### Restore Database
+
+Restores a previously backed up sqlite database file. The backup
+must be located at `<data_path>/backup/database/<filename>`. The
+`<filename>` must be a valid filename reported in by the
+[database list](#list-database-info) API.
+
+This API cannot be requested when Klipper is printing.
+
+!!! Note
+    Moonraker will restart immediately after this request is processed.
+
+HTTP request:
+```http
+POST /server/database/restore
+Content-Type: application/json
+
+{
+    "filename": "sql-db-backup.db"
+}
+```
+
+JSON-RPC request:
+```json
+{
+    "jsonrpc": "2.0",
+    "method": "server.database.restore",
+    "params": {
+        "filename": "sql-db-backup.db"
+    },
+    "id": 4654
+}
+```
+
+Parameters:
+
+- `filename`: The name of the database file to restore.  Must be a valid
+  filename reported in by the [database list](#list-database-info) API.
+  This parameter must be provided.
+
+Returns:
+An object containing a list of restored namespaces and restored tables.
+```json
+{
+    "restored_tables": [
+        "table_registry",
+        "namespace_store",
+        "authorized_users",
+        "job_history",
+        "job_totals"
+    ],
+    "restored_namespaces": [
+        "database",
+        "fluidd",
+        "gcode_metadata",
+        "mainsail",
+        "moonraker",
+        "update_manager",
+        "webcams"
+    ]
 }
 ```
 
@@ -3823,7 +4074,7 @@ JSON-RPC request:
     "method": "server.job_queue.delete_job",
     "params": {
         "job_ids": [
-            "0000000066D991F0".
+            "0000000066D991F0",
             "0000000066D99D80"
         ]
     },
@@ -3966,7 +4217,7 @@ JSON-RPC request:
 {
     "jsonrpc": "2.0",
     "method": "server.job_queue.jump",
-    "params" {
+    "params": {
         "job_id": "0000000066D991F0"
     },
     "id": 4654
@@ -4036,7 +4287,6 @@ sorted by `date` and a list of feeds Moonraker is currently subscribed to:
 
 ```json
 {
-    {
     "entries": [
         {
             "entry_id": "arksine/moonlight/issue/3",
@@ -4094,7 +4344,6 @@ sorted by `date` and a list of feeds Moonraker is currently subscribed to:
         "klipper",
         "moonlight"
     ]
-}
 }
 ```
 
@@ -4569,7 +4818,7 @@ The full configuration for the added/updated webcam:
 
 HTTP request:
 ```http
-DELETE /server/webcams/uid?name=341778f9-387f-455b-8b69-ff68442d41d9
+DELETE /server/webcams/item?uid=341778f9-387f-455b-8b69-ff68442d41d9
 ```
 JSON-RPC request:
 ```json
@@ -4870,7 +5119,7 @@ and `fluidd` are present as clients configured in `moonraker.conf`
                     "subject": "stm32: Wait for transmission to complete before returning from spi_transfer()",
                     "message": "It's possible for the SCLK pin to still be updating even after the\nlast byte of data has been read from the receive pin.  (In particular\nin spi mode 0 and 1.)  Exiting early from spi_transfer() in this case\ncould result in the CS pin being raised before the final updates to\nSCLK pin.\n\nAdd an additional wait at the end of spi_transfer() to avoid this\nissue.\n\nSigned-off-by: Kevin O'Connor <kevin@koconnor.net>",
                     "tag": null
-                },
+                }
             ],
             "git_messages": [],
             "full_version_string": "v0.10.0-1-g4c8d24ae-shallow",
@@ -4878,7 +5127,7 @@ and `fluidd` are present as clients configured in `moonraker.conf`
             "recovery_url": "https://github.com/Klipper3d/klipper.git",
             "remote_url": "https://github.com/Klipper3d/klipper.git",
             "warnings": [],
-            "anomalies": [],
+            "anomalies": []
         }
     }
 }
@@ -5228,7 +5477,7 @@ JSON-RPC request:
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"machine.device_power.devices",
+    "method": "machine.device_power.devices",
     "id": 5646
 }
 ```
@@ -5411,7 +5660,7 @@ JSON-RPC request:
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"machine.wled.strips",
+    "method": "machine.wled.strips",
     "id": 7123
 }
 ```
@@ -5420,56 +5669,7 @@ Returns:
 Strip information for all wled strips.
 ```json
 {
-    "result": {
-        "strips": {
-            "lights": {
-                "strip": "lights",
-                "status": "on",
-                "chain_count": 79,
-                "preset": -1,
-                "brightness": 255,
-                "intensity": -1,
-                "speed": -1,
-                "error": null
-            },
-            "desk": {
-                "strip": "desk",
-                "status": "on",
-                "chain_count": 60,
-                "preset": 8,
-                "brightness": -1,
-                "intensity": -1,
-                "speed": -1,
-                "error": null
-            }
-        }
-    }
-}
-```
-
-#### Get strip status
-HTTP request:
-```http
-GET /machine/wled/status?strip1&strip2
-```
-JSON-RPC request:
-```json
-{
-    "jsonrpc": "2.0",
-    "method":"machine.wled.status",
-    "params": {
-        "lights": null,
-        "desk": null
-    },
-    "id": 7124
-}
-```
-Returns:
-
-Strip information for requested strips.
-```json
-{
-    "result": {
+    "strips": {
         "lights": {
             "strip": "lights",
             "status": "on",
@@ -5490,6 +5690,51 @@ Strip information for requested strips.
             "speed": -1,
             "error": null
         }
+    }
+}
+```
+
+#### Get strip status
+HTTP request:
+```http
+GET /machine/wled/status?strip1&strip2
+```
+JSON-RPC request:
+```json
+{
+    "jsonrpc": "2.0",
+    "method": "machine.wled.status",
+    "params": {
+        "lights": null,
+        "desk": null
+    },
+    "id": 7124
+}
+```
+Returns:
+
+Strip information for requested strips.
+```json
+{
+    "lights": {
+        "strip": "lights",
+        "status": "on",
+        "chain_count": 79,
+        "preset": -1,
+        "brightness": 255,
+        "intensity": -1,
+        "speed": -1,
+        "error": null
+    },
+    "desk": {
+        "strip": "desk",
+        "status": "on",
+        "chain_count": 60,
+        "preset": 8,
+        "brightness": -1,
+        "intensity": -1,
+        "speed": -1,
+        "error": null
     }
 }
 ```
@@ -5505,7 +5750,7 @@ JSON-RPC request:
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"machine.wled.on",
+    "method": "machine.wled.on",
     "params": {
         "lights": null,
         "desk": null
@@ -5518,27 +5763,25 @@ Returns:
 Strip information for requested strips.
 ```json
 {
-    "result": {
-        "lights": {
-            "strip": "lights",
-            "status": "on",
-            "chain_count": 79,
-            "preset": -1,
-            "brightness": 255,
-            "intensity": -1,
-            "speed": -1,
-            "error": null
-        },
-        "desk": {
-            "strip": "desk",
-            "status": "on",
-            "chain_count": 60,
-            "preset": 8,
-            "brightness": -1,
-            "intensity": -1,
-            "speed": -1,
-            "error": null
-        }
+    "lights": {
+        "strip": "lights",
+        "status": "on",
+        "chain_count": 79,
+        "preset": -1,
+        "brightness": 255,
+        "intensity": -1,
+        "speed": -1,
+        "error": null
+    },
+    "desk": {
+        "strip": "desk",
+        "status": "on",
+        "chain_count": 60,
+        "preset": 8,
+        "brightness": -1,
+        "intensity": -1,
+        "speed": -1,
+        "error": null
     }
 }
 ```
@@ -5554,7 +5797,7 @@ JSON-RPC request:
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"machine.wled.off",
+    "method": "machine.wled.off",
     "params": {
         "lights": null,
         "desk": null
@@ -5567,27 +5810,25 @@ Returns:
 The new state of the specified strips.
 ```json
 {
-    "result": {
-        "lights": {
-            "strip": "lights",
-            "status": "off",
-            "chain_count": 79,
-            "preset": -1,
-            "brightness": 255,
-            "intensity": -1,
-            "speed": -1,
-            "error": null
-        },
-        "desk": {
-            "strip": "desk",
-            "status": "off",
-            "chain_count": 60,
-            "preset": 8,
-            "brightness": -1,
-            "intensity": -1,
-            "speed": -1,
-            "error": null
-        }
+    "lights": {
+        "strip": "lights",
+        "status": "off",
+        "chain_count": 79,
+        "preset": -1,
+        "brightness": 255,
+        "intensity": -1,
+        "speed": -1,
+        "error": null
+    },
+    "desk": {
+        "strip": "desk",
+        "status": "off",
+        "chain_count": 60,
+        "preset": 8,
+        "brightness": -1,
+        "intensity": -1,
+        "speed": -1,
+        "error": null
     }
 }
 ```
@@ -5597,13 +5838,13 @@ Turns each strip off if it is on and on if it is off.
 
 HTTP request:
 ```http
-POST /machine/wled/off?strip1&strip2
+POST /machine/wled/toggle?strip1&strip2
 ```
 JSON-RPC request:
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"machine.wled.toggle",
+    "method": "machine.wled.toggle",
     "params": {
         "lights": null,
         "desk": null
@@ -5616,27 +5857,25 @@ Returns:
 The new state of the specified strips.
 ```json
 {
-    "result": {
-        "lights": {
-            "strip": "lights",
-            "status": "on",
-            "chain_count": 79,
-            "preset": -1,
-            "brightness": 255,
-            "intensity": -1,
-            "speed": -1,
-            "error": null
-        },
-        "desk": {
-            "strip": "desk",
-            "status": "off",
-            "chain_count": 60,
-            "preset": 8,
-            "brightness": -1,
-            "intensity": -1,
-            "speed": -1,
-            "error": null
-        }
+    "lights": {
+        "strip": "lights",
+        "status": "on",
+        "chain_count": 79,
+        "preset": -1,
+        "brightness": 255,
+        "intensity": -1,
+        "speed": -1,
+        "error": null
+    },
+    "desk": {
+        "strip": "desk",
+        "status": "off",
+        "chain_count": 60,
+        "preset": 8,
+        "brightness": -1,
+        "intensity": -1,
+        "speed": -1,
+        "error": null
     }
 }
 ```
@@ -5680,9 +5919,9 @@ Returns information for the specified strip.
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"machine.wled.get_strip",
+    "method": "machine.wled.get_strip",
     "params": {
-        "strip": "lights",
+        "strip": "lights"
     },
     "id": 7128
 }
@@ -5692,7 +5931,7 @@ Calls the action with the arguments for the specified strip.
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"machine.wled.post_strip",
+    "method": "machine.wled.post_strip",
     "params": {
         "strip": "lights",
         "action": "on",
@@ -5719,17 +5958,15 @@ Returns:
 State of the strip.
 ```json
 {
-    "result": {
-        "lights": {
-            "strip": "lights",
-            "status": "on",
-            "chain_count": 79,
-            "preset": 1,
-            "brightness": 50,
-            "intensity": 255,
-            "speed": 255,
-            "error": null
-        }
+    "lights": {
+        "strip": "lights",
+        "status": "on",
+        "chain_count": 79,
+        "preset": 1,
+        "brightness": 50,
+        "intensity": 255,
+        "speed": 255,
+        "error": null
     }
 }
 ```
@@ -5740,19 +5977,32 @@ The APIs below are available when the `[sensor]` component has been configured.
 #### Get Sensor List
 HTTP request:
 ```http
-GET /server/sensors/list
+GET /server/sensors/list?extended=False
 ```
 JSON-RPC request:
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"server.sensors.list",
+    "method": "server.sensors.list",
+    "params": {
+        "extended": false
+    }
     "id": 5646
 }
 ```
+
+Parameters:
+
+- `extended`:  When set to `true` then each sensor will also include
+  parameter info and history field configuration. The default is false.
+
+
 Returns:
 
-An array of objects containing info for each configured sensor.
+An array of objects containing info for each configured sensor.  The
+`parameter_info` and `history_fields` items will only be present when
+the `extended` parameter is set to true.
+
 ```json
 {
     "sensors": {
@@ -5763,7 +6013,45 @@ An array of objects containing info for each configured sensor.
             "values": {
                 "value1": 0,
                 "value2": 119.8
-            }
+            },
+            "parameter_info": [
+                {
+                    "units": "kWh",
+                    "name": "value1"
+                },
+                {
+                    "units": "V",
+                    "name": "value2"
+                }
+            ],
+            "history_fields": [
+                {
+                    "field": "power_consumption",
+                    "provider": "sensor sensor1",
+                    "description": "Printer Power Consumption",
+                    "strategy": "delta",
+                    "units": "kWh",
+                    "init_tracker": true,
+                    "exclude_paused": false,
+                    "report_total": true,
+                    "report_maximum": true,
+                    "precision": 6,
+                    "parameter": "value1"
+                },
+                {
+                    "field": "max_voltage",
+                    "provider": "sensor sensor1",
+                    "description": "Maximum voltage",
+                    "strategy": "maximum",
+                    "units": "V",
+                    "init_tracker": true,
+                    "exclude_paused": false,
+                    "report_total": false,
+                    "report_maximum": false,
+                    "precision": 6,
+                    "parameter": "value2"
+                }
+            ]
         }
     }
 }
@@ -5774,7 +6062,7 @@ Returns the status for a single configured sensor.
 
 HTTP request:
 ```http
-GET /server/sensors/info?sensor=sensor1
+GET /server/sensors/info?sensor=sensor1&extended=false
 ```
 JSON-RPC request:
 ```json
@@ -5782,14 +6070,25 @@ JSON-RPC request:
     "jsonrpc": "2.0",
     "method": "server.sensors.info",
     "params": {
-        "sensor": "sensor1"
+        "sensor": "sensor1",
+        "extended": false
     },
     "id": 4564
 }
 ```
+
+Parameters:
+
+- `extended`:  When set to `true` then the response will also include
+  parameter info and history field configuration.  The default is false.
+
+
 Returns:
 
-An object containing sensor information for the requested sensor:
+An object containing sensor information for the requested sensor. The
+`parameter_info` and `history_fields` items will only be present when
+the `extended` parameter is set to true.
+
 ```json
 {
     "id": "sensor1",
@@ -5798,7 +6097,45 @@ An object containing sensor information for the requested sensor:
     "values": {
         "value1": 0.0,
         "value2": 120.0
-    }
+    },
+    "parameter_info": [
+        {
+            "units": "kWh",
+            "name": "value1"
+        },
+        {
+            "units": "V",
+            "name": "value2"
+        }
+    ],
+    "history_fields": [
+        {
+            "field": "power_consumption",
+            "provider": "sensor sensor1",
+            "description": "Printer Power Consumption",
+            "strategy": "delta",
+            "units": "kWh",
+            "init_tracker": true,
+            "exclude_paused": false,
+            "report_total": true,
+            "report_maximum": true,
+            "precision": 6,
+            "parameter": "value1"
+        },
+        {
+            "field": "max_voltage",
+            "provider": "sensor sensor1",
+            "description": "Maximum voltage",
+            "strategy": "maximum",
+            "units": "V",
+            "init_tracker": true,
+            "exclude_paused": false,
+            "report_total": false,
+            "report_maximum": false,
+            "precision": 6,
+            "parameter": "value2"
+        }
+    ]
 }
 ```
 
@@ -6172,7 +6509,7 @@ An object containing stubbed OctoPrint login/user verification
     "admin": true,
     "apikey": null,
     "permissions": [],
-    "groups": ["admins", "users"],
+    "groups": ["admins", "users"]
 }
 ```
 
@@ -6353,7 +6690,7 @@ JSON-RPC request:
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"server.history.list",
+    "method": "server.history.list",
     "params":{
         "limit": 50,
         "start": 10,
@@ -6392,8 +6729,62 @@ An array of requested historical jobs:
             "print_duration": 18.37201827496756,
             "status": "completed",
             "start_time": 1615764496.622146,
-            "total_duration": 18.37201827496756
-        },
+            "total_duration": 18.37201827496756,
+            "user": "testuser",
+            "auxiliary_data": [
+                {
+                    "provider": "sensor hist_test",
+                    "name": "power_consumption",
+                    "value": 4.119977,
+                    "description": "Printer Power Consumption",
+                    "units": "kWh"
+                },
+                {
+                    "provider": "sensor hist_test",
+                    "name": "max_current",
+                    "value": 2.768851,
+                    "description": "Maximum current draw",
+                    "units": "A"
+                },
+                {
+                    "provider": "sensor hist_test",
+                    "name": "min_current",
+                    "value": 0.426725,
+                    "description": "Minmum current draw",
+                    "units": "A"
+                },
+                {
+                    "provider": "sensor hist_test",
+                    "name": "avg_current",
+                    "value": 1.706872,
+                    "description": "Average current draw",
+                    "units": "A"
+                },
+                {
+                    "provider": "sensor hist_test",
+                    "name": "status",
+                    "value": 2,
+                    "description": "Power Switch Status",
+                    "units": null
+                },
+                {
+                    "provider": "sensor hist_test",
+                    "name": "filament",
+                    "value": 19.08058495194607,
+                    "description": "filament usage tracker",
+                    "units": "mm"
+                },
+                {
+                    "provider": "spoolman",
+                    "name": "spool_ids",
+                    "value": [
+                        1
+                    ],
+                    "description": "Spool IDs used",
+                    "units": null
+                }
+            ]
+        }
     ]
 }
 ```
@@ -6407,7 +6798,7 @@ JSON-RPC request:
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"server.history.totals",
+    "method": "server.history.totals",
     "id": 5656
 }
 ```
@@ -6424,7 +6815,27 @@ An object containing the following total job statistics:
         "total_filament_used": 11615.718840001999,
         "longest_job": 11665.191012736992,
         "longest_print": 11348.794790096988
-    }
+    },
+    "auxiliary_totals": [
+        {
+            "provider": "sensor hist_test",
+            "field": "power_consumption",
+            "maximum": 4.119977,
+            "total": 4.119977
+        },
+        {
+            "provider": "sensor hist_test",
+            "field": "avg_current",
+            "maximum": 1.706872,
+            "total": null
+        },
+        {
+            "provider": "sensor hist_test",
+            "field": "filament",
+            "maximum": 19.08058495194607,
+            "total": 19.08058495194607
+        }
+    ]
 }
 ```
 
@@ -6442,6 +6853,7 @@ JSON-RPC request:
     "method": "server.history.reset_totals",
     "id": 5534
 }
+```
 
 Returns:
 
@@ -6456,7 +6868,27 @@ The totals prior to the reset:
         "total_filament_used": 11615.718840001999,
         "longest_job": 11665.191012736992,
         "longest_print": 11348.794790096988
-    }
+    },
+    "last_auxiliary_totals": [
+        {
+            "provider": "sensor hist_test",
+            "field": "power_consumption",
+            "maximum": 4.119977,
+            "total": 4.119977
+        },
+        {
+            "provider": "sensor hist_test",
+            "field": "avg_current",
+            "maximum": 1.706872,
+            "total": null
+        },
+        {
+            "provider": "sensor hist_test",
+            "field": "filament",
+            "maximum": 19.08058495194607,
+            "total": 19.08058495194607
+        }
+    ]
 }
 ```
 
@@ -6469,7 +6901,7 @@ JSON-RPC request:
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"server.history.get_job",
+    "method": "server.history.get_job",
     "params":{"uid": "{uid}"},
     "id": 4564
 }
@@ -6554,7 +6986,7 @@ JSON-RPC request:
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"server.mqtt.publish",
+    "method": "server.mqtt.publish",
     "params":{
         "topic": "home/test/pub",
         "payload": "hello",
@@ -6616,7 +7048,7 @@ JSON-RPC request:
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"server.mqtt.subscribe",
+    "method": "server.mqtt.subscribe",
     "params":{
         "topic": "home/test/sub",
         "qos": 0,
@@ -6674,7 +7106,7 @@ JSON-RPC request:
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"server.extensions.list",
+    "method": "server.extensions.list",
     "id": 4564
 }
 ```
@@ -6718,7 +7150,7 @@ JSON-RPC request:
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"server.extensions.request",
+    "method": "server.extensions.request",
     "params":{
         "agent": "moonagent",
         "method": "moontest.hello_world",
@@ -6754,7 +7186,7 @@ JSON-RPC request:
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"connection.send_event",
+    "method": "connection.send_event",
     "params":{
         "event": "my_event",
         "data": {"my_arg": "optional data"}
@@ -6795,7 +7227,7 @@ JSON-RPC request:
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"connection.register_remote_method",
+    "method": "connection.register_remote_method",
     "params": {
         "method_name": "firemon_alert_heated"
     }
@@ -6849,7 +7281,7 @@ the agent will receive the following:
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"firemon_alert_heated",
+    "method": "firemon_alert_heated",
     "params": {
         "heater": "extruder",
         "temp": 200
@@ -6863,7 +7295,7 @@ receive the following:
 ```json
 {
     "jsonrpc": "2.0",
-    "method":"monitor_alert_heated"
+    "method": "monitor_alert_heated"
 }
 ```
 
@@ -6874,7 +7306,7 @@ receive the following:
 ### Debug APIs
 
 The APIs in this section are available when Moonraker the debug argument
-(`-g`) has been supplied via the command line.  Some API may also depend
+(`-g`) has been supplied via the command line.  Some APIs may also depend
 on Moonraker's configuration, ie: an optional component may choose to
 register a debug API.
 
@@ -6882,11 +7314,11 @@ register a debug API.
     Debug APIs may expose security vulnerabilities.  They should only be
     enabled by developers on secured machines.
 
-#### List Database Namespaces (debug)
+#### List Database Info (debug)
 
-Debug version of [List Namespaces](#list-namespaces). Return value includes
-namespaces exlusively reserved for Moonraker. Only availble when Moonraker's
-debug features are enabled.
+Debug version of [List Database Info](#list-database-info). Returns
+all namespaces, including those exlusively reserved for Moonraker.
+In addition, registered SQL tables are reported.
 
 
 HTTP request:
@@ -6903,14 +7335,42 @@ JSON-RPC request:
 }
 ```
 
+Returns:
+
+An object containing an array of namespaces, an array of tables, and
+an array of backup files.
+```json
+{
+    "namespaces": [
+        "gcode_metadata",
+        "webcams",
+        "update_manager",
+        "announcements",
+        "database",
+        "moonraker"
+    ],
+    "backups": [
+        "sqldb-backup-20240513-134542.db",
+        "testbackup.db",
+        "testbackup2.db"
+    ],
+    "tables": [
+        "job_history",
+        "job_totals",
+        "namespace_store",
+        "table_registry",
+        "authorized_users"
+    ]
+}
+```
+
 #### Get Database Item (debug)
 
 Debug version of [Get Database Item](#get-database-item).  Keys within
-protected and forbidden namespaces are accessible. Only availble when
-Moonraker's debug features are enabled.
+protected and forbidden namespaces are accessible.
 
 !!! Warning
-    Moonraker's forbidden namespaces include items such as user credentials.
+    Moonraker's forbidden namespaces may include items such as user credentials.
     This endpoint should NOT be implemented in front ends directly.
 
 HTTP request:
@@ -6933,8 +7393,7 @@ JSON-RPC request:
 #### Add Database Item (debug)
 
 Debug version of [Add Database Item](#add-database-item).  Keys within
-protected and forbidden namespaces may be added. Only availble when
-Moonraker's debug features are enabled.
+protected and forbidden namespaces may be added.
 
 !!! Warning
     This endpoint should be used for testing/debugging purposes only.
@@ -6970,8 +7429,7 @@ JSON-RPC request:
 #### Delete Database Item (debug)
 
 Debug version of [Delete Database Item](#delete-database-item).  Keys within
-protected and forbidden namespaces may be removed. Only availble when
-Moonraker's debug features are enabled.
+protected and forbidden namespaces may be removed.
 
 !!! Warning
     This endpoint should be used for testing/debugging purposes only.
@@ -6995,6 +7453,93 @@ JSON-RPC request:
         "key": "{key}"
     },
     "id": 4654
+}
+```
+
+#### Get Database Table
+
+Requests all the contents of a specified table.
+
+HTTP request:
+```http
+GET /debug/database/table?table=job_history
+```
+
+JSON-RPC request:
+```json
+{
+    "jsonrpc": "2.0",
+    "method": "debug.database.table",
+    "params": {
+        "table": "job_history"
+    },
+    "id": 4654
+}
+```
+
+Parameters:
+
+- `table`:  The name of the table to request.  This parameter must
+  be provided.
+
+Returns:
+
+An object with the table's name and a list of all rows contained
+within the table.  The `rowid` will always be included for each
+row, however it may be represented by an alias.  In the example
+below the alias for `rowid` is `job_id`.
+
+```json
+{
+    "table_name": "job_history",
+    "rows": [
+        {
+            "job_id": 1,
+            "user": "No User",
+            "filename": "active_test.gcode",
+            "status": "completed",
+            "start_time": 1690749153.2661753,
+            "end_time": 1690749173.076986,
+            "print_duration": 0.0,
+            "total_duration": 19.975574419135228,
+            "filament_used": 0.0,
+            "metadata": {
+                "size": 211,
+                "modified": 1635771217.0,
+                "uuid": "627371e0-faa5-4ced-8bb4-7017d29226fa",
+                "slicer": "Unknown",
+                "gcode_start_byte": 8,
+                "gcode_end_byte": 211
+            },
+            "auxiliary_data": [],
+            "instance_id": "default"
+        },
+        {
+            "job_id": 2,
+            "user": "No User",
+            "filename": "active_test.gcode",
+            "status": "completed",
+            "start_time": 1701262034.9242446,
+            "end_time": 1701262054.7332363,
+            "print_duration": 0.0,
+            "total_duration": 19.990913168992847,
+            "filament_used": 0.0,
+            "metadata": {
+                "size": 211,
+                "modified": 1635771217.0,
+                "uuid": "627371e0-faa5-4ced-8bb4-7017d29226fa",
+                "slicer": "Unknown",
+                "gcode_start_byte": 8,
+                "gcode_end_byte": 211
+            },
+            "auxiliary_data": {
+                "spool_ids": [
+                    2
+                ]
+            },
+            "instance_id": "default"
+        }
+    ]
 }
 ```
 

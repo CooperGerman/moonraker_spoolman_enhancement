@@ -56,6 +56,7 @@ if TYPE_CHECKING:
     from ..server import Server
     from ..eventloop import EventLoop
     from ..confighelper import ConfigHelper
+    from ..common import UserInfo
     from .klippy_connection import KlippyConnection as Klippy
     from ..utils import IPAddress
     from .websockets import WebsocketManager, WebSocket
@@ -65,10 +66,11 @@ if TYPE_CHECKING:
     from io import BufferedReader
     from .authorization import Authorization
     from .template import TemplateFactory, JinjaTemplate
-    MessageDelgate = Optional[tornado.httputil.HTTPMessageDelegate]
+    MessageDelgate = Optional[HTTPMessageDelegate]
     AuthComp = Optional[Authorization]
     APICallback = Callable[[WebRequest], Coroutine]
 
+# mypy: disable-error-code="attr-defined,name-defined"
 
 # 50 MiB Max Standard Body Size
 MAX_BODY_SIZE = 50 * 1024 * 1024
@@ -159,10 +161,10 @@ class PrimaryRouter(MutableRouter):
         else:
             log_method = access_log.error
         request_time = 1000.0 * handler.request.request_time()
-        user = handler.current_user
+        user: Optional[UserInfo] = handler.current_user
         username = "No User"
-        if user is not None and 'username' in user:
-            username = user['username']
+        if user is not None:
+            username = user.username
         log_method(
             f"{status_code} {handler._request_summary()} "
             f"[{username}] {request_time:.2f}ms"
@@ -724,7 +726,7 @@ class RPCHandler(AuthorizedRequestHandler, APITransport):
         return TransportType.HTTP
 
     @property
-    def user_info(self) -> Optional[Dict[str, Any]]:
+    def user_info(self) -> Optional[UserInfo]:
         return self.current_user
 
     @property
@@ -1010,6 +1012,7 @@ class FileUploadHandler(AuthorizedRequestHandler):
         for name, value in form_args.items():
             debug_msg += f"\n{name}: {value}"
         debug_msg += f"\nChecksum: {calc_chksum}"
+        form_args["current_user"] = self.current_user
         logging.debug(debug_msg)
         logging.info(f"Processing Uploaded File: {self._file.multipart_filename}")
         try:

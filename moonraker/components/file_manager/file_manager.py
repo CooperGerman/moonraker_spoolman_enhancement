@@ -43,18 +43,15 @@ from typing import (
 if TYPE_CHECKING:
     from inotify_simple import Event as InotifyEvent
     from ...confighelper import ConfigHelper
-    from ...common import WebRequest
+    from ...common import WebRequest, UserInfo
     from ..klippy_connection import KlippyConnection
-    from .. import database
-    from .. import klippy_apis
-    from .. import shell_command
     from ..job_queue import JobQueue
     from ..job_state import JobState
     from ..secrets import Secrets
+    from ..klippy_apis import KlippyAPI as APIComp
+    from ..database import MoonrakerDatabase as DBComp
+    from ..shell_command import ShellCommandFactory as SCMDComp
     StrOrPath = Union[str, pathlib.Path]
-    DBComp = database.MoonrakerDatabase
-    APIComp = klippy_apis.KlippyAPI
-    SCMDComp = shell_command.ShellCommandFactory
     _T = TypeVar("_T")
 
 VALID_GCODE_EXTS = ['.gcode', '.g', '.gco', '.ufp', '.nc']
@@ -79,9 +76,8 @@ class FileManager:
         db_path = db.get_database_path()
         self.add_reserved_path("database", db_path, False)
         self.add_reserved_path("certs", self.datapath.joinpath("certs"), False)
-        self.add_reserved_path(
-            "systemd", self.datapath.joinpath("systemd"), False
-        )
+        self.add_reserved_path("systemd", self.datapath.joinpath("systemd"), False)
+        self.add_reserved_path("backup", self.datapath.joinpath("backup"), False)
         self.gcode_metadata = MetadataStorage(config, db)
         self.sync_lock = NotifySyncLock(config)
         avail_observers: Dict[str, Type[BaseFileSystemObserver]] = {
@@ -618,6 +614,8 @@ class FileManager:
                     ):
                         action = "modify_file"
                     op_func = shutil.copy2
+            else:
+                raise self.server.error(f"Invalid endpoint {ep}")
             self.sync_lock.setup(action, dest_path, move_copy=True)
             try:
                 full_dest = await self.event_loop.run_in_thread(
@@ -883,7 +881,8 @@ class FileManager:
             'start_print': start_print,
             'unzip_ufp': unzip_ufp,
             'ext': f_ext,
-            "is_link": os.path.islink(dest_path)
+            "is_link": os.path.islink(dest_path),
+            "user": upload_args.get("current_user")
         }
 
     async def _finish_gcode_upload(
@@ -904,10 +903,11 @@ class FileManager:
         started: bool = False
         queued: bool = False
         if upload_info['start_print']:
+            user: Optional[UserInfo] = upload_info.get("user")
             if can_start:
                 kapis: APIComp = self.server.lookup_component('klippy_apis')
                 try:
-                    await kapis.start_print(upload_info['filename'])
+                    await kapis.start_print(upload_info['filename'], user=user)
                 except self.server.error:
                     # Attempt to start print failed
                     pass
@@ -916,7 +916,7 @@ class FileManager:
             if self.queue_gcodes and not started:
                 job_queue: JobQueue = self.server.lookup_component('job_queue')
                 await job_queue.queue_job(
-                    upload_info['filename'], check_exists=False)
+                    upload_info['filename'], check_exists=False, user=user)
                 queued = True
         self.fs_observer.on_item_create("gcodes", upload_info["dest_path"])
         result = dict(self._sched_changed_event(
@@ -1181,6 +1181,7 @@ class NotifySyncLock(asyncio.Lock):
         timeout = 1200. if has_pending else 1.
         for _ in range(5):
             try:
+                assert mcfut is not None
                 await asyncio.wait_for(asyncio.shield(mcfut), timeout)
             except asyncio.TimeoutError:
                 if timeout > 2.:
@@ -1961,7 +1962,7 @@ class InotifyObserver(BaseFileSystemObserver):
     def _handle_move_timeout(self, cookie: int, is_dir: bool):
         if cookie not in self.pending_moves:
             return
-        parent_node, name, hdl = self.pending_moves.pop(cookie)
+        parent_node, name, _ = self.pending_moves.pop(cookie)
         item_path = os.path.join(parent_node.get_path(), name)
         root = parent_node.get_root()
         self.clear_metadata(root, item_path, is_dir)
@@ -2279,6 +2280,8 @@ class MetadataStorage:
         self.server = config.get_server()
         self.enable_object_proc = config.getboolean(
             'enable_object_processing', False)
+        self.default_metadata_parser_timeout = config.getfloat(
+            'default_metadata_parser_timeout', 20.)
         self.gc_path = ""
         db.register_local_namespace(METADATA_NAMESPACE)
         self.mddb = db.wrap_namespace(
@@ -2544,13 +2547,13 @@ class MetadataStorage:
         filename = filename.replace("\"", "\\\"")
         cmd = " ".join([sys.executable, METADATA_SCRIPT, "-p",
                         self.gc_path, "-f", f"\"{filename}\""])
-        timeout = 10.
+        timeout = self.default_metadata_parser_timeout
         if ufp_path is not None and os.path.isfile(ufp_path):
-            timeout = 300.
+            timeout = max(timeout, 300.)
             ufp_path.replace("\"", "\\\"")
             cmd += f" -u \"{ufp_path}\""
         if self.enable_object_proc:
-            timeout = 300.
+            timeout = max(timeout, 300.)
             cmd += " --check-objects"
         result = bytearray()
         sc: SCMDComp = self.server.lookup_component('shell_command')
