@@ -54,13 +54,10 @@ class SpoolManager:
             - Spool swap table verification
         '''
         self.server = config.get_server()
-
         self.eventloop = self.server.get_event_loop()
         self._get_spoolman_urls(config)
-        self.sync_rate_seconds = config.getint(
-            "sync_rate", default=5, minval=1)
-        self.report_timer = self.eventloop.register_timer(
-            self.report_extrusion)
+        self.sync_rate_seconds = config.getint("sync_rate", default=5, minval=1)
+        self.report_timer = self.eventloop.register_timer(self.report_extrusion)
         self.pending_reports: Dict[int, float] = {}
         self.spoolman_ws: Optional[WebSocketClientConnection] = None
         self.connection_task: Optional[asyncio.Task] = None
@@ -68,7 +65,6 @@ class SpoolManager:
         self.ws_connected: bool = False
         self.reconnect_delay: float = 2.
         self.is_closing: bool = False
-        self.extruded_lock = asyncio.Lock()
         self.spool_id: Optional[int] = None
         self._error_logged: bool = False
         self._highest_epos: float = 0
@@ -80,12 +76,9 @@ class SpoolManager:
         history: History = self.server.lookup_component("history")
         history.register_auxiliary_field(self.spool_history)
         self.klippy_apis: APIComp = self.server.lookup_component("klippy_apis")
-        self.http_client: HttpClient = self.server.lookup_component(
-            "http_client")
-        self.database: MoonrakerDatabase = self.server.lookup_component(
-            "database")
-        announcements: Announcements = self.server.lookup_component(
-            "announcements")
+        self.http_client: HttpClient = self.server.lookup_component("http_client")
+        self.database: MoonrakerDatabase = self.server.lookup_component("database")
+        announcements: Announcements = self.server.lookup_component("announcements")
         announcements.register_feed("spoolman")
         self._register_notifications()
         self._register_listeners()
@@ -124,8 +117,7 @@ class SpoolManager:
 
     def _get_spoolman_urls(self, config: ConfigHelper) -> None:
         orig_url = config.get('server')
-        url_match = re.match(
-            r"(?i:(?P<scheme>https?)://)?(?P<host>.+)", orig_url)
+        url_match = re.match(r"(?i:(?P<scheme>https?)://)?(?P<host>.+)", orig_url)
         if url_match is None:
             raise config.error(
                 f"Section [spoolman], Option server: {orig_url}: Invalid URL format"
@@ -280,17 +272,14 @@ class SpoolManager:
                 connect_timeout=1., request_timeout=2.
             )
             if response.status_code == 404:
-                logging.info(
-                    f"Spool ID {self.spool_id} not found, setting to None")
+                logging.info(f"Spool ID {self.spool_id} not found, setting to None")
                 self.pending_reports.pop(self.spool_id, None)
                 self.set_active_spool(None)
             elif response.has_error():
                 err_msg = self._get_response_error(response)
-                logging.info(
-                    f"Attempt to check spool status failed: {err_msg}")
+                logging.info(f"Attempt to check spool status failed: {err_msg}")
             else:
-                logging.info(
-                    f"Found Spool ID {self.spool_id} on spoolman instance")
+                logging.info(f"Found Spool ID {self.spool_id} on spoolman instance")
         self.spool_check_task = None
 
     def connected(self) -> bool:
@@ -303,8 +292,7 @@ class SpoolManager:
         await self.get_spools_for_machine(silent=False)
         result: Dict[str, Dict[str, Any]]
         result = await self.klippy_apis.subscribe_objects(
-            {"toolhead": ["position", "extruder"]
-             }, self._handle_status_update, {}
+            {"toolhead": ["position", "extruder"]}, self._handle_status_update, {}
         )
         toolhead = result.get("toolhead", {})
         self._current_extruder = toolhead.get("extruder", "extruder")
@@ -327,8 +315,7 @@ class SpoolManager:
         toolhead: Optional[Dict[str, Any]] = status.get("toolhead")
         if toolhead is None:
             return
-        epos: float = toolhead.get(
-            "position", [0, 0, 0, self._highest_epos])[3]
+        epos: float = toolhead.get("position", [0, 0, 0, self._highest_epos])[3]
         extr = toolhead.get("extruder", self._current_extruder)
         if extr != self._current_extruder:
             self._highest_epos = epos
@@ -397,8 +384,7 @@ class SpoolManager:
                     # added while waiting for the request
                     self.pending_reports.pop(spool_id, None)
                     if spool_id == self.spool_id:
-                        logging.info(
-                            f"Spool ID {spool_id} not found, setting to None")
+                        logging.info(f"Spool ID {spool_id} not found, setting to None")
                         self.set_active_spool(None)
                 else:
                     if not self._error_logged:
