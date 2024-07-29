@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog].
 
 ## [Unreleased]
 
+## [0.9.1] - 2024-07-25
+
+### Fixed
+- **source_info**: Fixed `importlib.metadata` compatibility issues with python
+  versions 3.9 or older.
+
+## [0.9.0] - 2024-07-25
+
 ### Added
 - **notifier**: The `attach` option now supports Jinja2 templates.
 - **notifier**: The `attach` option may now contain multiple attachments,
@@ -35,12 +43,14 @@ The format is based on [Keep a Changelog].
 - **machine**: Add support for system peripheral queries
 - **mqtt**:  Added the `status_interval` option to support rate limiting
 - **mqtt**:  Added the `enable_tls` option to support ssl/tls connections
+- **mqtt**:  Added support for a configurable `client_id`
 - **history**: Added `user` field to job history data
 - **history**: Added support for auxiliary history fields
 - **spoolman**:  Report spool ids set during a print in history auxiliary data
 - **sensor**: Added support for history fields reported in auxiliary data
 - **power**:  Added support for `uhubctl` devices
 - **update_manager**: Add support for pinned git commits
+- **update_manager**: Added support for updating pip managed python apps
 
 ### Fixed
 
@@ -95,6 +105,10 @@ The format is based on [Keep a Changelog].
 - **database**: Migrated the underlying database from LMDB to Sqlite.
 - **history**: Use dedicated SQL tables to store job history and job totals.
 - **authorization**: Use a dedicated SQL table to store user data.
+
+### REMOVED
+
+- **simplyprint**: Removed defunct "AI" functionality
 
 ## [0.8.0] - 2023-02-23
 
@@ -176,6 +190,8 @@ The format is based on [Keep a Changelog].
 [api_changes.md]: api_changes.md
 
 <!-- Versions -->
-[unreleased]: https://github.com/Arksine/moonraker/compare/v0.8.0...HEAD
+[unreleased]: https://github.com/Arksine/moonraker/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/Arksine/moonraker/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/Arksine/moonraker/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Arksine/moonraker/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/Arksine/moonraker/releases/tag/v0.7.1

@@ -35,19 +35,6 @@ if TYPE_CHECKING:
     from ..machine import Machine
     from ..file_manager.file_manager import FileManager
 
-MIN_PIP_VERSION = (23, 3, 2)
-
-SUPPORTED_CHANNELS = {
-    AppType.WEB: [Channel.STABLE, Channel.BETA],
-    AppType.ZIP: [Channel.STABLE, Channel.BETA],
-    AppType.GIT_REPO: list(Channel)
-}
-TYPE_TO_CHANNEL = {
-    AppType.WEB: Channel.STABLE,
-    AppType.ZIP: Channel.STABLE,
-    AppType.GIT_REPO: Channel.DEV
-}
-
 DISTRO_ALIASES = [distro.id()]
 DISTRO_ALIASES.extend(distro.like().split())
 
@@ -57,23 +44,18 @@ class AppDeploy(BaseDeploy):
     ) -> None:
         super().__init__(config, cmd_helper, prefix=prefix)
         self.config = config
-        type_choices = list(TYPE_TO_CHANNEL.keys())
-        self.type = AppType.from_string(config.get('type'))
-        if self.type not in type_choices:
-            str_types = [str(t) for t in type_choices]
-            raise config.error(
-                f"Section [{config.get_name()}], Option 'type: {self.type}': "
-                f"value must be one of the following choices: {str_types}"
-            )
-        self.channel = Channel.from_string(
-            config.get("channel", str(TYPE_TO_CHANNEL[self.type]))
+        type_choices = {str(t): t for t in AppType.valid_types()}
+        self.type = config.getchoice("type", type_choices)
+        channel_choices = {str(chnl): chnl for chnl in list(Channel)}
+        self.channel = config.getchoice(
+            "channel", channel_choices, str(self.type.default_channel)
         )
         self.channel_invalid: bool = False
-        if self.channel not in SUPPORTED_CHANNELS[self.type]:
-            str_channels = [str(c) for c in SUPPORTED_CHANNELS[self.type]]
+        if self.channel not in self.type.supported_channels:
+            str_channels = [str(c) for c in self.type.supported_channels]
             self.channel_invalid = True
             invalid_channel = self.channel
-            self.channel = TYPE_TO_CHANNEL[self.type]
+            self.channel = self.type.default_channel
             self.server.add_warning(
                 f"[{config.get_name()}]: Invalid value '{invalid_channel}' for "
                 f"option 'channel'. Type '{self.type}' supports the following "
@@ -319,7 +301,7 @@ class AppDeploy(BaseDeploy):
         except asyncio.CancelledError:
             raise
         except Exception:
-            logging.exception(f"Error reading install script: {deps_json}")
+            logging.exception(f"Error reading install script: {inst_path}")
             return []
         plines: List[str] = re.findall(r'PKGLIST="(.*)"', data)
         plines = [p.lstrip("${PKGLIST}").strip() for p in plines]
@@ -401,7 +383,17 @@ class AppDeploy(BaseDeploy):
         pip_exec = pip_utils.AsyncPipExecutor(
             self.pip_cmd, self.server, self.cmd_helper.notify_update_response
         )
-        # Check the current pip version
+        # Check and update the pip version
+        await self._update_pip(pip_exec)
+        self.notify_status("Updating python packages...")
+        try:
+            await pip_exec.install_packages(requirements, self.pip_env_vars)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            self.log_exc("Error updating python requirements")
+
+    async def _update_pip(self, pip_exec: pip_utils.AsyncPipExecutor) -> None:
         self.notify_status("Checking pip version...")
         try:
             pip_ver = await pip_exec.get_pip_version()
@@ -413,18 +405,13 @@ class AppDeploy(BaseDeploy):
                 )
                 await pip_exec.update_pip()
                 self.pip_version = pip_utils.MIN_PIP_VERSION
+            else:
+                self.notify_status("Pip version up to date")
         except asyncio.CancelledError:
             raise
         except Exception as e:
             self.notify_status(f"Pip Version Check Error: {e}")
             self.log_exc("Pip Version Check Error")
-        self.notify_status("Updating python packages...")
-        try:
-            await pip_exec.install_packages(requirements, self.pip_env_vars)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            self.log_exc("Error updating python requirements")
 
     async def _collect_dependency_info(self) -> Dict[str, Any]:
         pkg_deps = await self._read_system_dependencies()

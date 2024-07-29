@@ -11,11 +11,12 @@ import logging
 import time
 import tempfile
 import pathlib
-from .common import AppType, get_base_configuration, get_app_type
+from .common import AppType, get_base_configuration
 from .base_deploy import BaseDeploy
 from .app_deploy import AppDeploy
 from .git_deploy import GitDeploy
 from .zip_deploy import ZipDeploy
+from .python_deploy import PythonDeploy
 from .system_deploy import PackageDeploy
 from ...common import RequestType
 from ...utils.filelock import AsyncExclusiveFileLock, LockTimeout
@@ -58,7 +59,8 @@ def get_deploy_class(
     _deployers = {
         AppType.WEB: ZipDeploy,
         AppType.GIT_REPO: GitDeploy,
-        AppType.ZIP: ZipDeploy
+        AppType.ZIP: ZipDeploy,
+        AppType.PYTHON: PythonDeploy
     }
     return _deployers.get(key, default)
 
@@ -130,7 +132,8 @@ class UpdateManager:
                     self.updaters[name] = deployer(cfg, self.cmd_helper)
             except Exception as e:
                 self.server.add_warning(
-                    f"[update_manager]: Failed to load extension {name}: {e}"
+                    f"[update_manager]: Failed to load extension {name}: {e}",
+                    exc_info=e
                 )
 
         self.cmd_request_lock = asyncio.Lock()
@@ -201,28 +204,20 @@ class UpdateManager:
     def _set_klipper_repo(self) -> None:
         if self.klippy_identified_evt is not None:
             self.klippy_identified_evt.set()
-        kinfo = self.server.get_klippy_info()
-        if not kinfo:
-            logging.info("No valid klippy info received")
-            return
-        kpath: str = kinfo['klipper_path']
-        executable: str = kinfo['python_path']
+
+        kconn: KlippyConnection = self.server.lookup_component("klippy_connection")
         kupdater = self.updaters.get('klipper')
-        app_type = get_app_type(kpath)
+        app_type = AppType.detect(kconn.path)
         if (
             (isinstance(kupdater, AppDeploy) and
-             kupdater.check_same_paths(kpath, executable)) or
+             kupdater.check_same_paths(kconn.path, kconn.executable)) or
             (app_type == AppType.NONE and type(kupdater) is BaseDeploy)
         ):
             # Current Klipper Updater is valid or unnecessary
             return
-        # Update paths in the database
-        db: DBComp = self.server.lookup_component('database')
-        db.insert_item("moonraker", "update_manager.klipper_path", kpath)
-        db.insert_item("moonraker", "update_manager.klipper_exec", executable)
         kcfg = self.app_config["klipper"]
-        kcfg.set_option("path", kpath)
-        kcfg.set_option("env", executable)
+        kcfg.set_option("path", str(kconn.path))
+        kcfg.set_option("env", str(kconn.executable))
         kcfg.set_option("type", str(app_type))
         notify = not isinstance(kupdater, AppDeploy)
         kclass = get_deploy_class(app_type, BaseDeploy)
