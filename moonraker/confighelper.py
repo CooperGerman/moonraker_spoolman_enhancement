@@ -531,7 +531,7 @@ class ConfigHelper:
 
     def create_backup(self) -> None:
         cfg_path = self.server.get_app_args()["config_file"]
-        cfg = pathlib.Path(cfg_path).expanduser().resolve()
+        cfg = pathlib.Path(cfg_path).expanduser()
         backup = cfg.parent.joinpath(f".{cfg.name}.bkp")
         backup_fp: Optional[TextIO] = None
         try:
@@ -1108,7 +1108,10 @@ class FileSourceWrapper(ConfigSourceWrapper):
 def get_configuration(
     server: Server, app_args: Dict[str, Any]
 ) -> ConfigHelper:
-    start_path = pathlib.Path(app_args['config_file']).expanduser().resolve()
+    cfg_file = app_args["config_file"]
+    if app_args["is_backup_config"]:
+        cfg_file = app_args["backup_config"]
+    start_path = pathlib.Path(cfg_file).expanduser().absolute()
     source = FileSourceWrapper(server)
     source.read_file(start_path)
     if not source.config.has_section('server'):
@@ -1116,7 +1119,7 @@ def get_configuration(
     return ConfigHelper(server, source, 'server', {})
 
 def find_config_backup(cfg_path: str) -> Optional[str]:
-    cfg = pathlib.Path(cfg_path).expanduser().resolve()
+    cfg = pathlib.Path(cfg_path).expanduser()
     backup = cfg.parent.joinpath(f".{cfg.name}.bkp")
     if backup.is_file():
         return str(backup)

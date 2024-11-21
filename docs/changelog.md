@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog].
 
 ## [Unreleased]
 
+## [0.9.3] - 2024-09-05
+
+### Changed
+- **server**: Use `asyncio.run` to launch the server as recommended by the
+  official Python documentation.
+- **announcements**: Look for xml files at `<data_path>/development/announcements`
+  when `dev_mode` is set to True.
+- **build**: Move scripts from the "data" directory into a folder inside the
+  moonraker package.
+
+### Fixed
+- **confighelper**: Don't resolve symbolic links to the main configuration file.
+- **power**: Allow special characters in the user/pass options for backends that
+  support Basic Authentication.
+
+## [0.9.2] - 2024-07-30
+
+### Added
+- **install**: Add support for installing Moonraker's python package via pip.
+- **scripts**: Add script to sync python and system dependencies from
+  `pyproject.toml` and `system-dependencies.json` respectively.
+- **dev**: Add pre-commit hook to call `sync_dependencies.py`.
+
+### Fixed
+- **build**: Build from sdist now correctly includes share data.
+- **build**: Remove stray `.gitignore` from Python Wheel.
+
+### Changed
+- **install**: The `MOONRAKER_FORCE_DEFAULTS` environment variable has changed
+  to `MOONRAKER_FORCE_SYSTEM_INSTALL`.
+
 ## [0.9.1] - 2024-07-25
 
 ### Fixed
@@ -190,7 +221,9 @@ The format is based on [Keep a Changelog].
 [api_changes.md]: api_changes.md
 
 <!-- Versions -->
-[unreleased]: https://github.com/Arksine/moonraker/compare/v0.9.1...HEAD
+[unreleased]: https://github.com/Arksine/moonraker/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/Arksine/moonraker/compare/v0.9.2...v0.9.3
+[0.9.2]: https://github.com/Arksine/moonraker/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/Arksine/moonraker/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/Arksine/moonraker/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Arksine/moonraker/compare/v0.7.1...v0.8.0
