@@ -240,9 +240,10 @@ class SpoolManager:
     async def _handle_klippy_ready(self) -> None:
         result: Dict[str, Dict[str, Any]]
         result = await self.klippy_apis.subscribe_objects(
-            {"toolhead": ["position", "extruder"]}, self._handle_status_update, {}
+            {"toolhead stealthburner": ["position", "extruder"]}, self._handle_status_update, {}
         )
-        toolhead = result.get("toolhead", {})
+        logging.error(f"Subscribed to toolhead: {result}")
+        toolhead = result.get("toolhead stealthburner", {})
         self._current_extruder = toolhead.get("extruder", "extruder")
         initial_e_pos = toolhead.get("position", [None]*4)[3]
         logging.debug(f"Initial epos: {initial_e_pos}")
@@ -260,7 +261,7 @@ class SpoolManager:
         return err_msg
 
     def _handle_status_update(self, status: Dict[str, Any], _: float) -> None:
-        toolhead: Optional[Dict[str, Any]] = status.get("toolhead")
+        toolhead: Optional[Dict[str, Any]] = status.get("toolhead stealthburner")
         if toolhead is None:
             return
         epos: float = toolhead.get("position", [0, 0, 0, self._highest_epos])[3]
